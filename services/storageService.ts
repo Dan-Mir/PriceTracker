@@ -25,37 +25,59 @@ export const findProductByBarcode = (barcode: string): Product | undefined => {
   return products.find(p => p.barcode === barcode);
 };
 
-export const addProductEntry = (entry: {
-  barcode: string;
+export const savePriceData = (data: {
+  barcode?: string;
   name: string;
   supermarket: string;
   price: number;
 }): Product[] => {
   const products = getProducts();
-  const existingProductIndex = products.findIndex(p => p.barcode === entry.barcode);
+  const productId = data.barcode || `manual_${data.name.toLowerCase().trim().replace(/\s+/g, '-')}`;
+  
+  const existingProductIndex = products.findIndex(p => p.barcode === productId);
   
   const newPriceEntry: PriceEntry = {
-    id: new Date().toISOString(),
-    supermarket: entry.supermarket,
-    price: entry.price,
+    id: new Date().toISOString() + Math.random().toString(36).substring(2, 9),
+    supermarket: data.supermarket,
+    price: data.price,
     date: new Date().toISOString(),
   };
 
   if (existingProductIndex > -1) {
     products[existingProductIndex].priceHistory.push(newPriceEntry);
-    // If the new entry provides a more detailed name, update it.
-    if (entry.name.length > products[existingProductIndex].name.length) {
-      products[existingProductIndex].name = entry.name;
+    if (data.barcode && data.name.length > products[existingProductIndex].name.length) {
+      products[existingProductIndex].name = data.name;
     }
   } else {
     const newProduct: Product = {
-      barcode: entry.barcode,
-      name: entry.name,
+      barcode: productId,
+      name: data.name,
       priceHistory: [newPriceEntry],
     };
     products.push(newProduct);
   }
 
   saveProducts(products);
+  return products;
+};
+
+export const deletePriceEntry = (productId: string, priceEntryId: string): Product[] => {
+  let products = getProducts();
+  const productIndex = products.findIndex(p => p.barcode === productId);
+
+  if (productIndex > -1) {
+    const updatedPriceHistory = products[productIndex].priceHistory.filter(
+      entry => entry.id !== priceEntryId
+    );
+
+    if (updatedPriceHistory.length > 0) {
+      products[productIndex].priceHistory = updatedPriceHistory;
+    } else {
+      products = products.filter(p => p.barcode !== productId);
+    }
+    
+    saveProducts(products);
+  }
+  
   return products;
 };

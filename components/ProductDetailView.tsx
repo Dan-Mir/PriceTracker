@@ -1,13 +1,14 @@
 import React from 'react';
 import { Product, PriceEntry } from '../types';
 import GeminiSuggestions from './GeminiSuggestions';
+import { TrashIcon } from './icons/TrashIcon';
 
 interface ProductDetailViewProps {
   product: Product;
-  onClose: () => void;
+  onDeleteEntry: (productId: string, priceEntryId: string) => void;
 }
 
-const ProductDetailView: React.FC<ProductDetailViewProps> = ({ product }) => {
+const ProductDetailView: React.FC<ProductDetailViewProps> = ({ product, onDeleteEntry }) => {
   const sortedHistory = [...product.priceHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const latestEntry = sortedHistory[0];
   const lowestPriceEntry = product.priceHistory.reduce((min, p) => p.price < min.price ? p : min, product.priceHistory[0]);
@@ -16,7 +17,9 @@ const ProductDetailView: React.FC<ProductDetailViewProps> = ({ product }) => {
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg p-6 animate-fade-in">
       <h2 className="text-3xl font-bold text-white mb-2">{product.name}</h2>
-      <p className="font-mono text-gray-400 mb-6">{product.barcode}</p>
+      {!product.barcode.startsWith('manual_') && (
+        <p className="font-mono text-gray-400 mb-6">{product.barcode}</p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 text-center">
         <div className="bg-green-500/10 p-4 rounded-lg">
@@ -41,12 +44,21 @@ const ProductDetailView: React.FC<ProductDetailViewProps> = ({ product }) => {
           <h3 className="text-xl font-semibold mb-4 text-gray-200">Price History</h3>
           <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
             {sortedHistory.map((entry: PriceEntry) => (
-              <div key={entry.id} className="flex justify-between items-center bg-gray-700/60 p-3 rounded-md">
+              <div key={entry.id} className="flex justify-between items-center bg-gray-700/60 p-3 rounded-md group">
                 <div>
                   <p className="font-semibold text-white">{entry.supermarket}</p>
                   <p className="text-xs text-gray-400">{new Date(entry.date).toLocaleDateString()}</p>
                 </div>
-                <p className="text-lg font-bold text-brand-primary">${entry.price.toFixed(2)}</p>
+                <div className="flex items-center space-x-4">
+                  <p className="text-lg font-bold text-brand-primary">${entry.price.toFixed(2)}</p>
+                  <button
+                    onClick={() => onDeleteEntry(product.barcode, entry.id)}
+                    className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                    aria-label="Delete entry"
+                  >
+                    <TrashIcon className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
