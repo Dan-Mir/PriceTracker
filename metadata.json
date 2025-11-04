@@ -1,0 +1,7 @@
+{
+  "name": "Supermarket Price Tracker",
+  "description": "A web application to track product prices across different supermarkets. Scan barcodes, enter prices, and compare costs to find the best deals. Includes AI-powered suggestions for alternative products.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
