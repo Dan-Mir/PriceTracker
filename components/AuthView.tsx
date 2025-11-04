@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { login } from '../services/authService';
+import { login, register } from '../services/authService';
 import { LockIcon } from './icons/LockIcon';
 import { UserIcon } from './icons/UserIcon';
 
@@ -8,24 +8,34 @@ interface AuthViewProps {
 }
 
 const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegister, setIsRegister] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    // Simulate API call
-    setTimeout(() => {
-      if (login(password)) {
+    if (isRegister) {
+      const success = await register(username, password);
+      if (success) {
+        setIsRegister(false);
+        setError('Registration successful! Please log in.');
+      } else {
+        setError('Registration failed. Please try again.');
+      }
+    } else {
+      const success = await login(username, password);
+      if (success) {
         onLoginSuccess();
       } else {
-        setError('Please enter a password.');
-        setIsLoading(false);
+        setError('Invalid username or password.');
       }
-    }, 500);
+    }
+    setIsLoading(false);
   };
 
   return (
@@ -35,16 +45,17 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
           <h1 className="text-4xl font-bold text-brand-primary">PriceWise</h1>
           <p className="mt-2 text-gray-400">Your Personal Price Tracker</p>
         </div>
-        <form className="space-y-6" onSubmit={handleLogin}>
+        <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="relative">
              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                 <UserIcon className="w-5 h-5 text-gray-400" />
             </div>
             <input
               type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full bg-gray-700 border border-gray-600 rounded-md py-3 pl-10 pr-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              placeholder="Username (any)"
-              disabled
+              placeholder="Username"
             />
           </div>
           <div className="relative">
@@ -57,7 +68,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-gray-700 border border-gray-600 rounded-md py-3 pl-10 pr-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              placeholder="Password (any)"
+              placeholder="Password"
               autoFocus
             />
           </div>
@@ -68,10 +79,15 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
               disabled={isLoading}
               className="w-full bg-brand-primary hover:bg-brand-secondary text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 disabled:opacity-50"
             >
-              {isLoading ? 'Signing In...' : 'Sign In'}
+              {isLoading ? 'Loading...' : (isRegister ? 'Register' : 'Sign In')}
             </button>
           </div>
         </form>
+        <div className="text-center">
+          <button onClick={() => setIsRegister(!isRegister)} className="text-sm text-gray-400 hover:underline">
+            {isRegister ? 'Already have an account? Sign In' : "Don't have an account? Register"}
+          </button>
+        </div>
       </div>
     </div>
   );

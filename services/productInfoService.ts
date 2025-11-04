@@ -1,33 +1,27 @@
-const API_URL = 'https://world.openfoodfacts.org/api/v2/product/';
+import axios from 'axios';
+import { getAuthToken } from './authService';
 
-interface OpenFoodFactsResponse {
-  code: string;
-  product?: {
-    product_name: string;
-  };
-  status: number;
-  status_verbose: string;
-}
+const API_URL = 'http://localhost:3001/api';
+
+const apiClient = axios.create({
+    baseURL: API_URL,
+});
+
+apiClient.interceptors.request.use(config => {
+    const token = getAuthToken();
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
 
 export const fetchProductInfoByBarcode = async (barcode: string): Promise<{ name: string } | null> => {
   try {
-    const response = await fetch(`${API_URL}${barcode}?fields=product_name`);
-    if (!response.ok) {
-      console.error(`API request failed with status: ${response.status}`);
-      return null;
-    }
-    
-    const data: OpenFoodFactsResponse = await response.json();
-    
-    if (data.product && data.product.product_name) {
-      return { name: data.product.product_name };
-    }
-    
-    console.warn(`Product not found for barcode: ${barcode}`, data);
-    return null;
-
+    const response = await apiClient.post('/barcode', { barcode });
+    return response.data;
   } catch (error) {
-    console.error("Error fetching product info from Open Food Facts API:", error);
+    console.error("Error fetching product info from API", error);
     return null;
   }
 };

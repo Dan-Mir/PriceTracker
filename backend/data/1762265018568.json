@@ -1,0 +1,37 @@
+[
+  {
+    "barcode": "12345",
+    "name": "Test Product",
+    "priceHistory": [
+      {
+        "supermarket": "Test Supermarket",
+        "price": 1.99,
+        "date": "2024-01-01"
+      }
+    ]
+  },
+  {
+    "barcode": "manual_1762265784707",
+    "name": "Test Product",
+    "priceHistory": [
+      {
+        "supermarket": "Test Supermarket",
+        "price": 1.99,
+        "id": "2025-11-04T14:16:24.707Z0.7921717328426132",
+        "date": "2025-11-04T14:16:24.720Z"
+      }
+    ]
+  },
+  {
+    "barcode": "manual_1762266544226",
+    "name": "Test Product",
+    "priceHistory": [
+      {
+        "supermarket": "Test Supermarket",
+        "price": 1.99,
+        "id": "2025-11-04T14:29:04.227Z0.7916235438423167",
+        "date": "2025-11-04T14:29:04.227Z"
+      }
+    ]
+  }
+]

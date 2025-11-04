@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Product, PriceEntry } from './types';
-import { loadProducts, saveProducts } from './services/storageService';
+import { loadProducts, addOrUpdateProduct as apiAddOrUpdateProduct, deletePriceEntry as apiDeletePriceEntry } from './services/storageService';
 import { fetchProductInfoByBarcode } from './services/productInfoService';
 import ProductList from './components/ProductList';
 import ProductDetailView from './components/ProductDetailView';
@@ -14,10 +14,10 @@ import { checkAuth, logout } from './services/authService';
 import { BarcodeIcon } from './components/icons/BarcodeIcon';
 import { EditIcon } from './components/icons/EditIcon';
 
-type ModalState = 
-  | 'none' 
-  | 'scanning' 
-  | 'productForm' 
+type ModalState =
+  | 'none'
+  | 'scanning'
+  | 'productForm'
   | 'manualForm'
   | 'productNamePrompt';
 
@@ -34,16 +34,14 @@ const App: React.FC = () => {
   const [isLoadingProductInfo, setIsLoadingProductInfo] = useState(false);
 
   useEffect(() => {
-    if (isLoggedIn) {
-      setProducts(loadProducts());
-    }
+    const fetchProducts = async () => {
+        if (isLoggedIn) {
+            const fetchedProducts = await loadProducts();
+            setProducts(fetchedProducts);
+        }
+    };
+    fetchProducts();
   }, [isLoggedIn]);
-
-  useEffect(() => {
-    if (isLoggedIn) {
-        saveProducts(products);
-    }
-  }, [products, isLoggedIn]);
 
   const handleLoginSuccess = () => {
     setIsLoggedIn(true);
@@ -74,7 +72,7 @@ const App: React.FC = () => {
     }
   }, [products]);
 
-  const addOrUpdateProduct = (
+  const addOrUpdateProduct = async (
     barcode: string,
     name: string,
     priceEntry: { supermarket: string; price: number }
@@ -85,26 +83,11 @@ const App: React.FC = () => {
       date: new Date().toISOString(),
     };
 
-    setProducts(prevProducts => {
-      const existingProductIndex = prevProducts.findIndex(p => p.barcode === barcode);
-      let newProducts = [...prevProducts];
+    const updatedProducts = await apiAddOrUpdateProduct({ barcode, name, priceEntry: newPriceEntry });
+    setProducts(updatedProducts);
+    const updatedSelectedProduct = updatedProducts.find(p => p.barcode === barcode);
+    setSelectedProduct(updatedSelectedProduct || null);
 
-      if (existingProductIndex > -1) {
-        const updatedProduct = { ...newProducts[existingProductIndex] };
-        updatedProduct.priceHistory = [...updatedProduct.priceHistory, newPriceEntry];
-        newProducts[existingProductIndex] = updatedProduct;
-        setSelectedProduct(updatedProduct);
-      } else {
-        const newProduct: Product = {
-          barcode,
-          name,
-          priceHistory: [newPriceEntry],
-        };
-        newProducts.push(newProduct);
-        setSelectedProduct(newProduct);
-      }
-      return newProducts;
-    });
 
     setModal('none');
     setScannedBarcode(null);
@@ -115,30 +98,17 @@ const App: React.FC = () => {
      addOrUpdateProduct(`manual_${new Date().getTime()}`, entry.name, {supermarket: entry.supermarket, price: entry.price});
   }
 
-  const handleDeleteEntry = (productId: string, priceEntryId: string) => {
-    setProducts(prevProducts => {
-        const newProducts = prevProducts.map(p => {
-            if (p.barcode === productId) {
-                const updatedHistory = p.priceHistory.filter(e => e.id !== priceEntryId);
-                return { ...p, priceHistory: updatedHistory };
-            }
-            return p;
-        }).filter(p => p.priceHistory.length > 0); // Remove product if it has no price entries left
-
-        const currentSelected = selectedProduct;
-        if(currentSelected && currentSelected.barcode === productId) {
-            const updatedSelectedProduct = newProducts.find(p => p.barcode === productId);
-            setSelectedProduct(updatedSelectedProduct || null);
-        }
-
-        return newProducts;
-    });
+  const handleDeleteEntry = async (productId: string, priceEntryId: string) => {
+    const updatedProducts = await apiDeletePriceEntry(productId, priceEntryId);
+    setProducts(updatedProducts);
+    const updatedSelectedProduct = updatedProducts.find(p => p.barcode === productId);
+    setSelectedProduct(updatedSelectedProduct || null);
   }
-  
+
   const handleBackToList = () => {
     setSelectedProduct(null);
   };
-  
+
   if (!isLoggedIn) {
     return <AuthView onLoginSuccess={handleLoginSuccess} />;
   }
@@ -146,7 +116,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans">
       <Header currentView={currentView} onSetView={setCurrentView} onLogout={handleLogout} />
-      
+
       <main className="container mx-auto max-w-4xl p-4">
         {currentView === 'home' && (
           <>
@@ -185,7 +155,7 @@ const App: React.FC = () => {
       </main>
 
       {modal === 'scanning' && <BarcodeScannerModal onClose={() => setModal('none')} onScanSuccess={handleScanSuccess} />}
-      
+
       {isLoadingProductInfo && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
             <p className="text-xl">Fetching product info...</p>
@@ -202,7 +172,7 @@ const App: React.FC = () => {
       )}
 
       {modal === 'manualForm' && (
-        <ManualProductFormModal 
+        <ManualProductFormModal
             onClose={() => setModal('none')}
             onAddProduct={handleManualAddProduct}
         />
