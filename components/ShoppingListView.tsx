@@ -1,71 +1,31 @@
-// FIX: Corrected the React import statement by removing the typo 'getE,'. This resolves all reported errors for this file.
-import React, { useState, useEffect } from 'react';
-import { Product, ShoppingListAnalysisResult } from '../types';
+import React, { useState } from 'react';
 import { analyzeShoppingList } from '../services/geminiService';
-import { getShoppingList, saveShoppingList } from '../services/storageService';
-import { ShoppingCartIcon } from './icons/ShoppingCartIcon';
-import { TrashIcon } from './icons/TrashIcon';
+import { Product, ShoppingListAnalysisResult } from '../types';
 
 interface ShoppingListViewProps {
   products: Product[];
 }
 
 const ShoppingListView: React.FC<ShoppingListViewProps> = ({ products }) => {
-  const [listItems, setListItems] = useState<{ text: string; id: string }[]>([]);
-  const [newItemText, setNewItemText] = useState('');
-  const [analysis, setAnalysis] = useState<ShoppingListAnalysisResult[] | null>(null);
+  const [listText, setListText] = useState('');
+  const [analysisResult, setAnalysisResult] = useState<ShoppingListAnalysisResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    setListItems(getShoppingList());
-    const savedChecked = localStorage.getItem('shopping-list-checked');
-    if (savedChecked) {
-      setCheckedItems(new Set(JSON.parse(savedChecked)));
-    }
-  }, []);
-
-  useEffect(() => {
-    saveShoppingList(listItems);
-  }, [listItems]);
-
-  useEffect(() => {
-    localStorage.setItem('shopping-list-checked', JSON.stringify(Array.from(checkedItems)));
-  }, [checkedItems]);
-
-
-  const handleAddItem = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newItemText.trim()) {
-      setListItems(prev => [...prev, { text: newItemText.trim(), id: Date.now().toString() }]);
-      setNewItemText('');
-    }
-  };
-
-  const handleRemoveItem = (idToRemove: string) => {
-    setListItems(prev => prev.filter(item => item.id !== idToRemove));
-    // Also remove from analysis if it exists
-    if (analysis) {
-        const correspondingItem = listItems.find(li => li.id === idToRemove);
-        if (correspondingItem) {
-            setAnalysis(prev => prev?.filter(res => res.itemName !== correspondingItem.text) ?? null);
-        }
-    }
-  };
+  const [error, setError] = useState<string | null>(null);
 
   const handleAnalyze = async () => {
-    if (listItems.length === 0) {
-        setError("Your shopping list is empty.");
-        return;
+    const shoppingList = listText.split('\n').map(item => item.trim()).filter(item => item);
+    if (shoppingList.length === 0) {
+      setError("Please enter at least one item in your shopping list.");
+      return;
     }
+    
     setIsLoading(true);
-    setError('');
-    setAnalysis(null);
+    setError(null);
+    setAnalysisResult([]);
+    
     try {
-      const itemTexts = listItems.map(item => item.text);
-      const result = await analyzeShoppingList(itemTexts, products);
-      setAnalysis(result);
+      const result = await analyzeShoppingList(shoppingList, products);
+      setAnalysisResult(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
     } finally {
@@ -73,103 +33,73 @@ const ShoppingListView: React.FC<ShoppingListViewProps> = ({ products }) => {
     }
   };
 
-  const handleToggleChecked = (itemName: string) => {
-    setCheckedItems(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(itemName)) {
-            newSet.delete(itemName);
-        } else {
-            newSet.add(itemName);
-        }
-        return newSet;
-    });
-  };
+  const totalCost = analysisResult
+    .filter(item => item.status === 'FOUND' && item.lowestPrice)
+    .reduce((sum, item) => sum + (item.lowestPrice || 0), 0);
+  
+  const notFoundItems = analysisResult.filter(item => item.status === 'NOT_FOUND');
 
   return (
-    <div className="bg-gray-800 rounded-lg shadow-lg p-6 animate-fade-in grid grid-cols-1 md:grid-cols-2 gap-8">
-      <div>
-        <h2 className="text-3xl font-bold text-white mb-6">Create Your List</h2>
-        <form onSubmit={handleAddItem} className="flex gap-2 mb-4">
-          <input
-            type="text"
-            value={newItemText}
-            onChange={(e) => setNewItemText(e.target.value)}
-            placeholder="e.g., Milk, Bread, Soap..."
-            className="flex-grow bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
-          />
-          <button type="submit" className="bg-brand-primary hover:bg-brand-secondary text-white font-bold py-2 px-4 rounded-lg transition-colors">
-            Add
-          </button>
-        </form>
+    <div className="p-4 sm:p-6 space-y-6 animate-fade-in">
+      <div className="bg-gray-800 rounded-lg shadow-lg p-6">
+        <h2 className="text-3xl font-bold text-white mb-4">Shopping List Analyzer</h2>
+        <p className="text-gray-400 mb-6">
+          Enter your shopping list below (one item per line). The AI will cross-reference it with your tracked products to find the best prices.
+        </p>
 
-        <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 mb-4">
-          {listItems.length > 0 ? (
-            listItems.map(item => (
-              <div key={item.id} className="flex justify-between items-center bg-gray-700/60 p-3 rounded-md">
-                <span className={`text-white ${checkedItems.has(item.text) ? 'line-through text-gray-400' : ''}`}>{item.text}</span>
-                <button onClick={() => handleRemoveItem(item.id)} className="text-gray-500 hover:text-red-400">
-                  <TrashIcon className="w-5 h-5" />
-                </button>
-              </div>
-            ))
-          ) : (
-            <p className="text-gray-400 text-center py-4">Your shopping list is empty.</p>
-          )}
-        </div>
+        <textarea
+          value={listText}
+          onChange={(e) => setListText(e.target.value)}
+          rows={8}
+          className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+          placeholder="e.g.,&#10;Organic Milk&#10;Whole Wheat Bread&#10;Avocados"
+        />
         <button
-            onClick={handleAnalyze}
-            disabled={isLoading || listItems.length === 0}
-            className="w-full bg-brand-secondary hover:bg-brand-secondary/80 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleAnalyze}
+          disabled={isLoading || products.length === 0}
+          className="mt-4 w-full bg-brand-primary hover:bg-brand-secondary text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-            {isLoading ? 'Analyzing...' : 'Analyze with AI'}
+          {isLoading ? 'Analyzing...' : 'Analyze My List'}
         </button>
-        {error && <p className="text-red-400 mt-2 text-center">{error}</p>}
+        {products.length === 0 && <p className="text-center text-yellow-400 mt-2 text-sm">You need to track some products first before using the analyzer.</p>}
+        {error && <p className="text-center text-red-400 mt-4">{error}</p>}
       </div>
-      <div>
-        <h2 className="text-3xl font-bold text-white mb-6">AI Shopping Plan</h2>
-        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-            {isLoading && <p className="text-center text-gray-400">Assistant is thinking...</p>}
-            {analysis ? (
-                analysis.map(result => (
-                    <div
-                        key={result.itemName}
-                        onClick={() => handleToggleChecked(result.itemName)}
-                        className={`p-4 rounded-lg cursor-pointer transition-all ${checkedItems.has(result.itemName) ? 'bg-green-500/10' : 'bg-gray-700/60 hover:bg-gray-700'}`}
-                    >
-                        <div className="flex items-start">
-                             <div className="flex items-center h-6 mt-1">
-                                <input
-                                    type="checkbox"
-                                    checked={checkedItems.has(result.itemName)}
-                                    readOnly
-                                    className="form-checkbox h-5 w-5 text-brand-primary bg-gray-800 border-gray-600 rounded focus:ring-brand-secondary"
-                                />
-                            </div>
-                            <div className="ml-3 text-sm">
-                                <label className={`font-bold text-lg ${checkedItems.has(result.itemName) ? 'text-gray-400 line-through' : 'text-white'}`}>
-                                    {result.itemName}
-                                </label>
-                                {result.status === 'FOUND' ? (
-                                    <p className={`mt-1 ${checkedItems.has(result.itemName) ? 'text-gray-500' : 'text-gray-300'}`}>
-                                        Buy <span className="font-semibold text-brand-primary">{result.matchedProductName}</span> at <span className="font-semibold">{result.bestSupermarket}</span> for <span className="font-semibold">${result.lowestPrice?.toFixed(2)}</span>
-                                    </p>
-                                ) : (
-                                    <p className="mt-1 text-yellow-400">Not found in your price history.</p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                ))
-            ) : (
-                 !isLoading && (
-                    <div className="flex flex-col items-center justify-center h-full text-center bg-gray-900/50 rounded-lg p-8">
-                        <ShoppingCartIcon className="w-16 h-16 text-gray-600 mb-4" />
-                        <p className="text-gray-400">Your optimized shopping plan will appear here after analysis.</p>
-                    </div>
-                 )
-            )}
+
+      {analysisResult.length > 0 && (
+        <div className="bg-gray-800 rounded-lg shadow-lg p-6">
+          <h3 className="text-2xl font-bold text-white mb-4">Analysis Results</h3>
+          <div className="space-y-3">
+            {analysisResult.map((item, index) => (
+              <div key={index} className={`p-4 rounded-lg flex justify-between items-center ${item.status === 'FOUND' ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                <div>
+                  <p className="font-semibold text-white">{item.itemName}</p>
+                  {item.status === 'FOUND' ? (
+                    <p className="text-sm text-gray-300">
+                      Best price at <span className="font-bold text-green-300">{item.bestSupermarket}</span> for <span className="font-bold text-green-300">${item.lowestPrice?.toFixed(2)}</span>
+                       <span className="text-gray-400 text-xs"> (matched: {item.matchedProductName})</span>
+                    </p>
+                  ) : (
+                    <p className="text-sm text-red-300">Not found in your tracked products.</p>
+                  )}
+                </div>
+                {item.status === 'FOUND' && <p className="text-xl font-bold text-white">${item.lowestPrice?.toFixed(2)}</p>}
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 border-t border-gray-700 pt-4 text-right">
+              <p className="text-gray-300">Estimated Total Cost:</p>
+              <p className="text-3xl font-bold text-brand-primary">${totalCost.toFixed(2)}</p>
+          </div>
+           {notFoundItems.length > 0 && (
+            <div className="mt-4 border-t border-gray-700 pt-4">
+              <h4 className="font-semibold text-yellow-300">Items Not Found:</h4>
+              <ul className="list-disc list-inside text-gray-400">
+                {notFoundItems.map(item => <li key={item.itemName}>{item.itemName}</li>)}
+              </ul>
+            </div>
+           )}
         </div>
-      </div>
+      )}
     </div>
   );
 };
