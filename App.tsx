@@ -1,189 +1,218 @@
 import React, { useState, useEffect } from 'react';
-import { Product } from './types';
-import { getProducts, savePriceData, findProductByBarcode, deletePriceEntry } from './services/storageService';
+import { Product, PriceEntry } from './types';
+import { getProducts, saveProducts } from './services/storageService';
 import { fetchProductInfoByBarcode } from './services/productInfoService';
 import Header from './components/Header';
-import ProductFormModal from './components/ProductFormModal';
-import BarcodeScannerModal from './components/BarcodeScannerModal';
-import ProductDetailView from './components/ProductDetailView';
 import ProductList from './components/ProductList';
+import ProductDetailView from './components/ProductDetailView';
+import BarcodeScannerModal from './components/BarcodeScannerModal';
+import ProductFormModal from './components/ProductFormModal';
 import ManualProductFormModal from './components/ManualProductFormModal';
+import ShoppingListView from './components/ShoppingListView';
 import { BarcodeIcon } from './components/icons/BarcodeIcon';
-import { SearchIcon } from './components/icons/SearchIcon';
-import { ListIcon } from './components/icons/ListIcon';
 import { EditIcon } from './components/icons/EditIcon';
+import { ShoppingCartIcon } from './components/icons/ShoppingCartIcon';
+import { ListIcon } from './components/icons/ListIcon';
 
-type View = 'home' | 'scanning' | 'adding' | 'viewing' | 'list' | 'addingManually';
-type ScanMode = 'register' | 'search';
+type View = 'list' | 'detail' | 'shopping';
+type Modal = 'scanner' | 'addProduct' | 'manualAdd' | null;
 
 const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
-  const [view, setView] = useState<View>('home');
-  const [scanMode, setScanMode] = useState<ScanMode>('search');
-  const [scannedData, setScannedData] = useState<{ barcode: string; name: string } | null>(null);
-  const [activeProduct, setActiveProduct] = useState<Product | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<View>('list');
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [activeModal, setActiveModal] = useState<Modal>(null);
+  const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
+  const [isLoadingProductInfo, setIsLoadingProductInfo] = useState(false);
 
   useEffect(() => {
     setProducts(getProducts());
   }, []);
 
   useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => setError(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [error]);
-
-  const handleStartScan = (mode: ScanMode) => {
-    setScanMode(mode);
-    setView('scanning');
-  };
-
-  const handleScanSuccess = async (barcode: string) => {
-    setView('home');
-    setIsLoading(true);
-    setError(null);
-    
-    if (scanMode === 'register') {
-      const productInfo = await fetchProductInfoByBarcode(barcode);
-      if (productInfo && productInfo.name) {
-        setScannedData({ barcode, name: productInfo.name });
-        setView('adding');
-      } else {
-        setError(`Could not find product information for barcode ${barcode}. You can try adding it manually.`);
-      }
-    } else { // search mode
-      const product = findProductByBarcode(barcode);
-      if (product) {
-        setActiveProduct(product);
-        setView('viewing');
-      } else {
-        setError(`Product with barcode ${barcode} not found in your database. Please register it first.`);
-      }
-    }
-    setIsLoading(false);
-  };
-  
-  const handleAddProduct = (entry: { supermarket: string; price: number; }) => {
-    if (!scannedData) return;
-    const updatedProducts = savePriceData({ barcode: scannedData.barcode, name: scannedData.name, ...entry });
-    setProducts(updatedProducts);
-    setView('home');
-    setScannedData(null);
-  };
-
-  const handleAddManualProduct = (entry: { name: string; supermarket: string; price: number }) => {
-    const updatedProducts = savePriceData(entry);
-    setProducts(updatedProducts);
-    setView('home');
-  };
-  
-  const handleDeletePriceEntry = (productId: string, priceEntryId: string) => {
-    if (!window.confirm("Are you sure you want to delete this price entry?")) {
-      return;
-    }
-    const updatedProducts = deletePriceEntry(productId, priceEntryId);
-    setProducts(updatedProducts);
-
-    const stillExistingProduct = updatedProducts.find(p => p.barcode === productId);
-    if (stillExistingProduct) {
-      setActiveProduct(stillExistingProduct);
-    } else {
-      setActiveProduct(null);
-      setView('list'); 
-    }
-  };
+    saveProducts(products);
+  }, [products]);
 
   const handleProductSelect = (product: Product) => {
-    setActiveProduct(product);
-    setView('viewing');
+    setSelectedProduct(product);
+    setCurrentView('detail');
+  };
+  
+  const handleGoHome = () => {
+    setSelectedProduct(null);
+    setCurrentView('list');
+  };
+  
+  const handleScanSuccess = async (barcode: string) => {
+    setActiveModal(null);
+    const existingProduct = products.find(p => p.barcode === barcode);
+    if (existingProduct) {
+      setSelectedProduct(existingProduct);
+      setScannedBarcode(barcode);
+      setActiveModal('addProduct');
+    } else {
+      setIsLoadingProductInfo(true);
+      const productInfo = await fetchProductInfoByBarcode(barcode);
+      setIsLoadingProductInfo(false);
+      if (productInfo) {
+        const newProduct: Product = {
+          barcode,
+          name: productInfo.name,
+          priceHistory: [],
+        };
+        // Add product first to get it in the list, then open modal
+        setProducts(prev => [...prev, newProduct]);
+        setSelectedProduct(newProduct);
+        setScannedBarcode(barcode);
+        setActiveModal('addProduct');
+      } else {
+        alert(`Could not find product information for barcode: ${barcode}. You may need to add it manually.`);
+      }
+    }
   };
 
-  const renderHome = () => (
-    <div className="text-center py-10 px-4">
-      <h2 className="text-3xl font-bold text-gray-200 mb-4">What would you like to do?</h2>
-      <p className="text-gray-400 mb-10 max-w-xl mx-auto">Select an option to track prices or look up a saved product.</p>
+  const handleAddPriceEntry = (entry: { supermarket: string; price: number; }) => {
+    if (!selectedProduct) return;
+
+    const newPriceEntry: PriceEntry = {
+      ...entry,
+      id: new Date().toISOString(),
+      date: new Date().toISOString(),
+    };
+    
+    setProducts(prevProducts => {
+        const updatedProducts = prevProducts.map(p => {
+            if (p.barcode === selectedProduct.barcode) {
+                return { ...p, priceHistory: [...p.priceHistory, newPriceEntry] };
+            }
+            return p;
+        });
+        const updatedSelectedProduct = updatedProducts.find(p => p.barcode === selectedProduct.barcode);
+        if (updatedSelectedProduct) {
+            setSelectedProduct(updatedSelectedProduct);
+        }
+        return updatedProducts;
+    });
+
+    setActiveModal(null);
+    setScannedBarcode(null);
+  };
+  
+  const handleAddManualProduct = (entry: { name: string; supermarket: string; price: number; }) => {
+      const newPriceEntry: PriceEntry = {
+          supermarket: entry.supermarket,
+          price: entry.price,
+          id: new Date().toISOString(),
+          date: new Date().toISOString(),
+      };
       
-      {isLoading && (
-        <div className="flex justify-center items-center my-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
-          <p className="ml-3 text-gray-300">Processing...</p>
-        </div>
-      )}
+      const newProduct: Product = {
+          name: entry.name,
+          barcode: `manual_${new Date().getTime()}`, // unique ID for manual entries
+          priceHistory: [newPriceEntry],
+      };
+      
+      setProducts(prev => [...prev, newProduct]);
+      setActiveModal(null);
+  };
 
-      {error && (
-        <div className="bg-red-500/20 text-red-300 p-3 rounded-md mb-6 max-w-2xl mx-auto">
-          {error}
-        </div>
-      )}
+  const handleDeleteEntry = (productId: string, priceEntryId: string) => {
+    if (!window.confirm("Are you sure you want to delete this price entry?")) return;
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-        <button onClick={() => handleStartScan('register')} className="bg-gray-800 p-8 rounded-lg shadow-lg hover:bg-gray-700/80 transition-all duration-300 transform hover:-translate-y-1 border border-gray-700 flex flex-col items-center justify-center">
-          <BarcodeIcon className="w-12 h-12 text-brand-primary mb-4" />
-          <h3 className="text-xl font-bold text-white mb-2">Register Item</h3>
-          <p className="text-gray-400">Scan a barcode to add a new price entry.</p>
-        </button>
-        <button onClick={() => handleStartScan('search')} className="bg-gray-800 p-8 rounded-lg shadow-lg hover:bg-gray-700/80 transition-all duration-300 transform hover:-translate-y-1 border border-gray-700 flex flex-col items-center justify-center">
-          <SearchIcon className="w-12 h-12 text-brand-secondary mb-4" />
-          <h3 className="text-xl font-bold text-white mb-2">Search Item</h3>
-          <p className="text-gray-400">Scan a barcode to view its price history.</p>
-        </button>
-        <button onClick={() => setView('addingManually')} className="bg-gray-800 p-8 rounded-lg shadow-lg hover:bg-gray-700/80 transition-all duration-300 transform hover:-translate-y-1 border border-gray-700 flex flex-col items-center justify-center">
-          <EditIcon className="w-12 h-12 text-green-400 mb-4" />
-          <h3 className="text-xl font-bold text-white mb-2">Add Manually</h3>
-          <p className="text-gray-400">Enter details for an item without a barcode.</p>
-        </button>
-        <button onClick={() => setView('list')} className="bg-gray-800 p-8 rounded-lg shadow-lg hover:bg-gray-700/80 transition-all duration-300 transform hover:-translate-y-1 border border-gray-700 flex flex-col items-center justify-center">
-          <ListIcon className="w-12 h-12 text-gray-300 mb-4" />
-          <h3 className="text-xl font-bold text-white mb-2">View All Products</h3>
-          <p className="text-gray-400">Browse and search all your saved items.</p>
-        </button>
-      </div>
-    </div>
-  );
+    setProducts(prevProducts => {
+      const updatedProducts = prevProducts.map(p => {
+        if (p.barcode === productId) {
+          const updatedHistory = p.priceHistory.filter(e => e.id !== priceEntryId);
+          return { ...p, priceHistory: updatedHistory };
+        }
+        return p;
+      }).filter(p => p.priceHistory.length > 0 || !p.barcode.startsWith('manual_')); // Remove product if it has no history, unless it was a scanned one
 
-  const renderContent = () => {
-    switch (view) {
-      case 'viewing':
-        return activeProduct && <ProductDetailView product={activeProduct} onDeleteEntry={handleDeletePriceEntry} />;
+      const updatedSelectedProduct = updatedProducts.find(p => p.barcode === selectedProduct?.barcode);
+      if (updatedSelectedProduct) {
+        setSelectedProduct(updatedSelectedProduct);
+      } else {
+        // If the selected product was deleted
+        handleGoHome();
+      }
+      return updatedProducts;
+    });
+  };
+
+  const renderView = () => {
+    switch(currentView) {
+      case 'detail':
+        return selectedProduct && <ProductDetailView product={selectedProduct} onDeleteEntry={handleDeleteEntry} />;
+      case 'shopping':
+        return <ShoppingListView products={products} />;
       case 'list':
-        return <ProductList products={products} onProductSelect={handleProductSelect} />;
-      case 'home':
       default:
-        return renderHome();
+        return <ProductList products={products} onProductSelect={handleProductSelect} />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 font-sans">
-      <Header showHomeButton={view !== 'home'} onHomeClick={() => setView('home')} />
+    <div className="bg-gray-900 min-h-screen text-gray-200 font-sans pb-24">
+      <Header showHomeButton={currentView !== 'list'} onHomeClick={handleGoHome} />
       <main className="container mx-auto p-4 md:p-6">
-        {renderContent()}
+        {isLoadingProductInfo && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <p className="text-white text-xl">Fetching product info...</p>
+            </div>
+        )}
+        {renderView()}
       </main>
+      <footer className="fixed bottom-0 left-0 right-0 bg-gray-800/80 backdrop-blur-sm shadow-top p-2 border-t border-gray-700">
+        <div className="container mx-auto flex justify-center items-center space-x-4">
+           <button 
+                onClick={() => setCurrentView('list')}
+                className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors w-24 ${currentView === 'list' ? 'text-brand-primary' : 'text-gray-400 hover:text-white'}`}
+            >
+                <ListIcon className="w-6 h-6" />
+                <span className="text-xs font-medium">Products</span>
+            </button>
+            <button 
+                onClick={() => setActiveModal('scanner')}
+                className="bg-brand-primary hover:bg-brand-secondary text-white rounded-full p-4 transform -translate-y-6 shadow-lg border-4 border-gray-900"
+                aria-label="Scan new barcode"
+            >
+                <BarcodeIcon className="w-8 h-8"/>
+            </button>
+             <button 
+                onClick={() => setCurrentView('shopping')}
+                className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors w-24 ${currentView === 'shopping' ? 'text-brand-primary' : 'text-gray-400 hover:text-white'}`}
+            >
+                <ShoppingCartIcon className="w-6 h-6" />
+                <span className="text-xs font-medium">Shopping List</span>
+            </button>
+        </div>
+      </footer>
       
-      {view === 'scanning' && (
-        <BarcodeScannerModal 
-          onClose={() => setView('home')}
-          onScanSuccess={handleScanSuccess}
+      {/* Modals */}
+      {activeModal === 'scanner' && <BarcodeScannerModal onClose={() => setActiveModal(null)} onScanSuccess={handleScanSuccess} />}
+      {activeModal === 'addProduct' && selectedProduct && (
+        <ProductFormModal 
+          onClose={() => { setActiveModal(null); setScannedBarcode(null); }}
+          onAddProduct={handleAddPriceEntry}
+          barcode={selectedProduct.barcode}
+          productName={selectedProduct.name}
         />
       )}
-
-      {view === 'adding' && scannedData && (
-        <ProductFormModal
-          onClose={() => setView('home')}
-          onAddProduct={handleAddProduct}
-          barcode={scannedData.barcode}
-          productName={scannedData.name}
-        />
-      )}
-
-      {view === 'addingManually' && (
-        <ManualProductFormModal
-          onClose={() => setView('home')}
+      {activeModal === 'manualAdd' && (
+        <ManualProductFormModal 
+          onClose={() => setActiveModal(null)}
           onAddProduct={handleAddManualProduct}
         />
+      )}
+       {/* Floating action button for manual add on list view */}
+      {currentView === 'list' && (
+          <button
+              onClick={() => setActiveModal('manualAdd')}
+              className="fixed bottom-24 right-6 bg-brand-secondary hover:bg-brand-secondary/80 text-white rounded-full p-4 shadow-lg"
+              aria-label="Add product manually"
+          >
+              <EditIcon className="w-6 h-6" />
+          </button>
       )}
     </div>
   );
