@@ -20,7 +20,7 @@ export const fetchProductInfoByBarcode = async (barcode: string): Promise<{ name
   try {
     const response = await apiClient.post('/barcode', { barcode });
     return response.data;
-  } catch (error).
+  } catch (error) {
     console.error("Error fetching product info from API", error);
     return null;
   }
