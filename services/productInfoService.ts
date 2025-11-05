@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { getAuthToken } from './authService';
 
-const API_URL = '/api';
+const API_URL = 'https://pricetracker-pwsp.onrender.com/api';
 
 const apiClient = axios.create({
     baseURL: API_URL,
@@ -20,7 +20,7 @@ export const fetchProductInfoByBarcode = async (barcode: string): Promise<{ name
   try {
     const response = await apiClient.post('/barcode', { barcode });
     return response.data;
-  } catch (error) {
+  } catch (error).
     console.error("Error fetching product info from API", error);
     return null;
   }
