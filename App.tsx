@@ -31,13 +31,16 @@ const App: React.FC = () => {
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
   const [scannedProductName, setScannedProductName] = useState<string>('');
   const [currentView, setCurrentView] = useState<View>('home');
-  const [isLoadingProductInfo, setIsLoadingProductInfo] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProducts = async () => {
         if (isLoggedIn) {
+            setIsLoading(true);
             const fetchedProducts = await loadProducts();
             setProducts(fetchedProducts);
+            setIsLoading(false);
         }
     };
     fetchProducts();
@@ -64,11 +67,15 @@ const App: React.FC = () => {
       setScannedProductName(existingProduct.name);
       setModal('productForm');
     } else {
-      setIsLoadingProductInfo(true);
+      setIsLoading(true);
       const productInfo = await fetchProductInfoByBarcode(barcode);
-      setIsLoadingProductInfo(false);
-      setScannedProductName(productInfo?.name || '');
-      setModal('productForm');
+      setIsLoading(false);
+      if (productInfo) {
+        setScannedProductName(productInfo?.name || '');
+        setModal('productForm');
+      } else {
+        setErrorMessage("Could not find product information for this barcode.");
+      }
     }
   }, [products]);
 
@@ -83,15 +90,20 @@ const App: React.FC = () => {
       date: new Date().toISOString(),
     };
 
-    const updatedProducts = await apiAddOrUpdateProduct({ barcode, name, priceEntry: newPriceEntry });
-    setProducts(updatedProducts);
-    const updatedSelectedProduct = updatedProducts.find(p => p.barcode === barcode);
-    setSelectedProduct(updatedSelectedProduct || null);
-
-
-    setModal('none');
-    setScannedBarcode(null);
-    setScannedProductName('');
+    setIsLoading(true);
+    try {
+        const updatedProducts = await apiAddOrUpdateProduct({ barcode, name, priceEntry: newPriceEntry });
+        setProducts(updatedProducts);
+        const updatedSelectedProduct = updatedProducts.find(p => p.barcode === barcode);
+        setSelectedProduct(updatedSelectedProduct || null);
+        setModal('none');
+    } catch (e) {
+        setErrorMessage("Could not save the product. The server might be busy. Please try again in a moment.");
+    } finally {
+        setIsLoading(false);
+        setScannedBarcode(null);
+        setScannedProductName('');
+    }
   };
 
   const handleManualAddProduct = (entry: {name: string, supermarket: string, price: number}) => {
@@ -99,10 +111,17 @@ const App: React.FC = () => {
   }
 
   const handleDeleteEntry = async (productId: string, priceEntryId: string) => {
-    const updatedProducts = await apiDeletePriceEntry(productId, priceEntryId);
-    setProducts(updatedProducts);
-    const updatedSelectedProduct = updatedProducts.find(p => p.barcode === productId);
-    setSelectedProduct(updatedSelectedProduct || null);
+    setIsLoading(true);
+    try {
+        const updatedProducts = await apiDeletePriceEntry(productId, priceEntryId);
+        setProducts(updatedProducts);
+        const updatedSelectedProduct = updatedProducts.find(p => p.barcode === productId);
+        setSelectedProduct(updatedSelectedProduct || null);
+    } catch(e) {
+        setErrorMessage("Could not delete the entry. Please try again in a moment.");
+    } finally {
+        setIsLoading(false);
+    }
   }
 
   const handleBackToList = () => {
@@ -118,6 +137,7 @@ const App: React.FC = () => {
       <Header currentView={currentView} onSetView={setCurrentView} onLogout={handleLogout} />
 
       <main className="container mx-auto max-w-4xl p-4">
+        {isLoading && products.length === 0 && <p>Loading products...</p>}
         {currentView === 'home' && (
           <>
             {selectedProduct ? (
@@ -154,13 +174,14 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {modal === 'scanning' && <BarcodeScannerModal onClose={() => setModal('none')} onScanSuccess={handleScanSuccess} />}
-
-      {isLoadingProductInfo && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-            <p className="text-xl">Fetching product info...</p>
+      {errorMessage && (
+        <div className="fixed bottom-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg animate-fade-in" onClick={() => setErrorMessage(null)}>
+          <p className="font-bold">Error</p>
+          <p>{errorMessage}</p>
         </div>
       )}
+
+      {modal === 'scanning' && <BarcodeScannerModal onClose={() => setModal('none')} onScanSuccess={handleScanSuccess} />}
 
       {modal === 'productForm' && scannedBarcode && (
         <ProductFormModal
@@ -175,6 +196,7 @@ const App: React.FC = () => {
         <ManualProductFormModal
             onClose={() => setModal('none')}
             onAddProduct={handleManualAddProduct}
+            isLoading={isLoading}
         />
       )}
     </div>
