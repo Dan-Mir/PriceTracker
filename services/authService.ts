@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = '/api';
+const API_URL = 'https://pricetracker-pwsp.onrender.com/api';
 const AUTH_TOKEN_KEY = 'authToken';
 
 export const checkAuth = (): boolean => {
