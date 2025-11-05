@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor-community/barcode-scanner": "^4.0.1",
+    "@capacitor/camera": "^7.0.2",
     "@google/genai": "^1.28.0",
     "axios": "^1.13.1",
     "react": "^19.2.0",

@@ -8,9 +8,10 @@ interface ManualProductFormModalProps {
     supermarket: string;
     price: number;
   }) => void;
+  isLoading: boolean;
 }
 
-const ManualProductFormModal: React.FC<ManualProductFormModalProps> = ({ onClose, onAddProduct }) => {
+const ManualProductFormModal: React.FC<ManualProductFormModalProps> = ({ onClose, onAddProduct, isLoading }) => {
   const [productName, setProductName] = useState('');
   const [supermarket, setSupermarket] = useState('');
   const [price, setPrice] = useState('');
@@ -18,6 +19,7 @@ const ManualProductFormModal: React.FC<ManualProductFormModalProps> = ({ onClose
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     const priceNumber = parseFloat(price);
     if (!productName || !supermarket || !price || isNaN(priceNumber) || priceNumber <= 0) {
       setError('Please fill all fields correctly. Price must be a positive number.');
@@ -38,8 +40,9 @@ const ManualProductFormModal: React.FC<ManualProductFormModalProps> = ({ onClose
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white"
+          className="absolute top-4 right-4 text-gray-400 hover:text-white disabled:opacity-50"
           aria-label="Close modal"
+          disabled={isLoading}
         >
           <XIcon className="w-6 h-6" />
         </button>
@@ -48,47 +51,50 @@ const ManualProductFormModal: React.FC<ManualProductFormModalProps> = ({ onClose
         {error && <p className="bg-red-500/20 text-red-400 p-3 rounded-md mb-4">{error}</p>}
         
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="productName" className="block text-sm font-medium text-gray-300">Product Name</label>
-            <input
-              id="productName"
-              type="text"
-              value={productName}
-              onChange={(e) => setProductName(e.target.value)}
-              className="mt-1 w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              placeholder="e.g., Organic Apples, Fresh Bread"
-              autoFocus
-            />
-          </div>
-          <div>
-            <label htmlFor="supermarket" className="block text-sm font-medium text-gray-300">Supermarket</label>
-            <input
-              id="supermarket"
-              type="text"
-              value={supermarket}
-              onChange={(e) => setSupermarket(e.target.value)}
-              className="mt-1 w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              placeholder="e.g., FreshMart, MegaGrocer"
-            />
-          </div>
-          <div>
-            <label htmlFor="price" className="block text-sm font-medium text-gray-300">Price</label>
-            <input
-              id="price"
-              type="number"
-              step="0.01"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              className="mt-1 w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              placeholder="e.g., 3.49"
-            />
-          </div>
+          <fieldset disabled={isLoading}>
+            <div>
+              <label htmlFor="productName" className="block text-sm font-medium text-gray-300">Product Name</label>
+              <input
+                id="productName"
+                type="text"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                className="mt-1 w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                placeholder="e.g., Organic Apples, Fresh Bread"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label htmlFor="supermarket" className="block text-sm font-medium text-gray-300">Supermarket</label>
+              <input
+                id="supermarket"
+                type="text"
+                value={supermarket}
+                onChange={(e) => setSupermarket(e.target.value)}
+                className="mt-1 w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                placeholder="e.g., FreshMart, MegaGrocer"
+              />
+            </div>
+            <div>
+              <label htmlFor="price" className="block text-sm font-medium text-gray-300">Price</label>
+              <input
+                id="price"
+                type="number"
+                step="0.01"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="mt-1 w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                placeholder="e.g., 3.49"
+              />
+            </div>
+          </fieldset>
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full bg-brand-primary hover:bg-brand-secondary text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300"
+              className="w-full bg-brand-primary hover:bg-brand-secondary text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 disabled:opacity-50"
+              disabled={isLoading}
             >
-              Save Price
+              {isLoading ? 'Saving...' : 'Save Price'}
             </button>
           </div>
         </form>
