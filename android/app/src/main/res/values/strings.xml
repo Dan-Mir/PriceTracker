@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PriceTracker</string>
+    <string name="title_activity_main">PriceTracker</string>
+    <string name="package_name">com.pricetracker.app</string>
+    <string name="custom_url_scheme">com.pricetracker.app</string>
+</resources>

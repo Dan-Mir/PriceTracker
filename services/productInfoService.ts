@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { getAuthToken } from './authService';
 
-const API_URL = 'https://pricetracker-pwsp.onrender.com/api';
+const API_URL = '/api';
 
 const apiClient = axios.create({
     baseURL: API_URL,

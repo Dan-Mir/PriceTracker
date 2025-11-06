@@ -19,6 +19,12 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 app.use(cors());
 app.use(bodyParser.json());
 
+// Simple request logger middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir);

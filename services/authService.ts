@@ -1,17 +1,17 @@
 import axios from 'axios';
 
-const API_URL = 'https://pricetracker-pwsp.onrender.com/api';
+const API_URL = '/api';
 const AUTH_TOKEN_KEY = 'authToken';
 
 export const checkAuth = (): boolean => {
-  return sessionStorage.getItem(AUTH_TOKEN_KEY) !== null;
+  return localStorage.getItem(AUTH_TOKEN_KEY) !== null;
 };
 
 export const login = async (username: string, password: string): Promise<boolean> => {
   try {
     const response = await axios.post(`${API_URL}/auth/login`, { username, password });
     if (response.data.token) {
-      sessionStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
+      localStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
       return true;
     }
     return false;
@@ -32,9 +32,9 @@ export const register = async (username: string, password: string): Promise<bool
 };
 
 export const logout = (): void => {
-  sessionStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_TOKEN_KEY);
 };
 
 export const getAuthToken = (): string | null => {
-    return sessionStorage.getItem(AUTH_TOKEN_KEY);
+    return localStorage.getItem(AUTH_TOKEN_KEY);
 }

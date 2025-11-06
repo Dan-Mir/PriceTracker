@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { BarcodeScanner, BarcodeScannerPermissionState } from '@capacitor-community/barcode-scanner';
+import React, { useEffect, useState } from 'react';
+import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { XIcon } from './icons/XIcon';
 
 interface BarcodeScannerModalProps {
@@ -10,60 +10,43 @@ interface BarcodeScannerModalProps {
 const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({ onClose, onScanSuccess }) => {
   const [error, setError] = useState<string | null>(null);
 
-  const stopScan = useCallback(async () => {
-    try {
-      document.body.classList.remove('scanner-active');
-      await BarcodeScanner.stopScan();
-    } catch (e) {
-      console.error("Error stopping scanner:", e);
-    }
-  }, []);
-
-  const handleClose = useCallback(() => {
-    stopScan();
+  const handleClose = () => {
+    BarcodeScanner.stopScan?.();
     onClose();
-  }, [stopScan, onClose]);
+  };
 
   useEffect(() => {
-    const startScan = async () => {
+    const performScan = async () => {
       try {
-        // First, check the current permission status without forcing a prompt
-        const status: BarcodeScannerPermissionState = await BarcodeScanner.checkPermission();
-
-        if (status.denied) {
-          // The user has previously denied permission.
-          setError("Camera permission is required. Please enable it in your app settings.");
+        const permissionStatus = await BarcodeScanner.requestPermissions();
+        if (permissionStatus.camera !== 'granted') {
+          setError("Camera permission is required for scanning. Please grant permission in settings.");
           return;
         }
 
-        // If permission is not granted, this will prompt the user.
-        await BarcodeScanner.checkPermission({ force: true });
-
-        // Hide the webview background to show the camera
-        await BarcodeScanner.hideBackground();
         document.body.classList.add('scanner-active');
 
-        const result = await BarcodeScanner.startScan();
+        const { barcodes } = await BarcodeScanner.scan();
 
-        if (result.hasContent) {
-          onScanSuccess(result.content!);
-        } else {
-          // Handle case where user closes scanner without scanning
-          handleClose();
+        if (barcodes.length > 0) {
+          onScanSuccess(barcodes[0].displayValue);
         }
       } catch (e: any) {
-        setError("An unexpected error occurred while trying to start the scanner.");
         console.error(e);
+        setError('An error occurred during the scan.');
+      } finally {
+        document.body.classList.remove('scanner-active');
+        onClose();
       }
     };
 
-    startScan();
+    performScan();
 
-    // Cleanup function to stop the scanner when the component unmounts
     return () => {
-      stopScan();
-    };
-  }, [onScanSuccess, handleClose, stopScan]);
+        BarcodeScanner.stopScan?.();
+    }
+
+  }, [onClose, onScanSuccess]);
 
 
   return (
