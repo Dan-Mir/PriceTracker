@@ -1,9 +1,9 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const fs = require('fs');
-const path = require('path');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const bcrypt = require('bcrypt');
@@ -14,7 +14,9 @@ const port = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+console.log('JWT_SECRET loaded:', JWT_SECRET); // Debugging line
+
+// const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -55,6 +57,16 @@ const readUserProducts = (userId) => {
 const writeUserProducts = (userId, products) => {
     const userProductsPath = path.join(dataDir, `${userId}.json`);
     fs.writeFileSync(userProductsPath, JSON.stringify(products, null, 2));
+};
+
+const parseGeminiResponse = (text) => {
+    const cleanedText = text.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+    try {
+        return JSON.parse(cleanedText);
+    } catch (error) {
+        console.error("Failed to parse Gemini response:", cleanedText);
+        throw new Error("Invalid JSON response from AI.");
+    }
 };
 
 const authenticateToken = (req, res, next) => {
@@ -139,6 +151,14 @@ app.delete('/api/products/:productId/entries/:entryId', authenticateToken, (req,
     res.json(products);
 });
 
+app.delete('/api/products/:productId', authenticateToken, (req, res) => {
+    const { productId } = req.params;
+    let products = readUserProducts(req.user.userId);
+    products = products.filter(p => p.barcode !== productId);
+    writeUserProducts(req.user.userId, products);
+    res.json(products);
+});
+
 app.post('/api/barcode', authenticateToken, async (req, res) => {
     const { barcode } = req.body;
     try {
@@ -153,6 +173,7 @@ app.post('/api/barcode', authenticateToken, async (req, res) => {
     }
 });
 
+/*
 app.post('/api/gemini/suggestions', authenticateToken, async (req, res) => {
     const { productName } = req.body;
     try {
@@ -185,12 +206,14 @@ app.post('/api/gemini/analyze-list', authenticateToken, async (req, res) => {
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
-        res.json(JSON.parse(text));
+        const jsonResponse = parseGeminiResponse(text);
+        res.json(jsonResponse);
     } catch (error) {
-        console.error("Error analyzing shopping list with Gemini API:", error);
+        console.error("Error analyzing shopping list with Gemini API:", error.message);
         res.status(500).json({ message: "Failed to get analysis from AI." });
     }
 });
+*/
 
 app.get('/', (req, res) => {
     res.send('Backend server is running!');

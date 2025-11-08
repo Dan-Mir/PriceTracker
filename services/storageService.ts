@@ -48,4 +48,14 @@ export const deletePriceEntry = async (productId: string, entryId: string): Prom
         console.error("Could not delete price entry from API", error);
         throw error;
     }
-}
+};
+
+export const deleteProduct = async (productId: string): Promise<Product[]> => {
+    try {
+        const response = await apiClient.delete(`/products/${productId}`);
+        return response.data;
+    } catch (error) {
+        console.error("Could not delete product from API", error);
+        throw error;
+    }
+};

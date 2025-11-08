@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Product, PriceEntry } from './types';
-import { loadProducts, addOrUpdateProduct as apiAddOrUpdateProduct, deletePriceEntry as apiDeletePriceEntry } from './services/storageService';
+import { loadProducts, addOrUpdateProduct as apiAddOrUpdateProduct, deletePriceEntry as apiDeleteEntry, deleteProduct } from './services/storageService';
 import { fetchProductInfoByBarcode } from './services/productInfoService';
 import ProductList from './components/ProductList';
 import ProductDetailView from './components/ProductDetailView';
@@ -113,7 +113,7 @@ const App: React.FC = () => {
   const handleDeleteEntry = async (productId: string, priceEntryId: string) => {
     setIsLoading(true);
     try {
-        const updatedProducts = await apiDeletePriceEntry(productId, priceEntryId);
+        const updatedProducts = await apiDeleteEntry(productId, priceEntryId);
         setProducts(updatedProducts);
         const updatedSelectedProduct = updatedProducts.find(p => p.barcode === productId);
         setSelectedProduct(updatedSelectedProduct || null);
@@ -123,6 +123,19 @@ const App: React.FC = () => {
         setIsLoading(false);
     }
   }
+
+  const handleDeleteProduct = async (productId: string) => {
+    setIsLoading(true);
+    try {
+      const updatedProducts = await deleteProduct(productId);
+      setProducts(updatedProducts);
+      setSelectedProduct(null);
+    } catch (e) {
+      setErrorMessage("Could not delete the product. Please try again in a moment.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleBackToList = () => {
     setSelectedProduct(null);
@@ -163,7 +176,7 @@ const App: React.FC = () => {
                         <span>Manual Entry</span>
                     </button>
                 </div>
-                <ProductList products={products} onProductSelect={setSelectedProduct} />
+                <ProductList products={products} onProductSelect={setSelectedProduct} onDeleteProduct={handleDeleteProduct} />
               </div>
             )}
           </>

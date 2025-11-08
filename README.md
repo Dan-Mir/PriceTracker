@@ -1,10 +1,10 @@
-# PriceWise: AI-Powered Supermarket Price Tracker
+# PriceTracker: AI-Powered Supermarket Price Tracker
 
-PriceWise is a modern web application designed to help users track and compare product prices across various supermarkets. By leveraging barcode scanning, manual entry, and a powerful AI assistant, users can make smarter shopping decisions and find the best deals.
+PriceTracker is a modern web application designed to help users track and compare product prices across various supermarkets. By leveraging barcode scanning, manual entry, and a powerful AI assistant, users can make smarter shopping decisions and find the best deals.
 
 This application is built with React, TypeScript, and Tailwind CSS, and it runs entirely in the browser, using local storage for data persistence.
 
-![PriceWise Application Screenshot](https://storage.googleapis.com/aistudio-hosting/docs/images/pricewise_screenshot.png)
+![PriceTracker Application Screenshot](https://storage.googleapis.com/aistudio-hosting/docs/images/pricewise_screenshot.png)
 
 ---
 

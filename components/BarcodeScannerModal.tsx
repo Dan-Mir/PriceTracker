@@ -24,7 +24,9 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({ onClose, onSc
           return;
         }
 
+        document.documentElement.classList.add('scanner-active');
         document.body.classList.add('scanner-active');
+        document.getElementById('root')?.classList.add('scanner-active');
 
         const { barcodes } = await BarcodeScanner.scan();
 
@@ -35,7 +37,9 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({ onClose, onSc
         console.error(e);
         setError('An error occurred during the scan.');
       } finally {
+        document.documentElement.classList.remove('scanner-active');
         document.body.classList.remove('scanner-active');
+        document.getElementById('root')?.classList.remove('scanner-active');
         onClose();
       }
     };
@@ -52,9 +56,14 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({ onClose, onSc
   return (
     <>
     <style>{`
+      html.scanner-active {
+        background: transparent !important;
+      }
       body.scanner-active {
         background: transparent !important;
-        opacity: 0; /* Hide web content to show camera view */
+      }
+      #root.scanner-active {
+        background: transparent !important;
       }
     `}</style>
     <div className="fixed inset-0 bg-transparent flex flex-col items-center justify-center z-50">

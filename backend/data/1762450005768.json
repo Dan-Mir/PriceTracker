@@ -1,0 +1,14 @@
+[
+  {
+    "barcode": "manual_1762450006458",
+    "name": "Test Product",
+    "priceHistory": [
+      {
+        "supermarket": "Test Supermarket",
+        "price": 1.23,
+        "id": "2025-11-06T17:26:46.458Z0.26735023973440986",
+        "date": "2025-11-06T17:26:46.458Z"
+      }
+    ]
+  }
+]

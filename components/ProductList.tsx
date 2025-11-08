@@ -1,14 +1,26 @@
 import React, { useState, useMemo } from 'react';
 import { Product } from '../types';
 import { SearchIcon } from './icons/SearchIcon';
+import { TrashIcon } from './icons/TrashIcon';
 
 interface ProductListProps {
   products: Product[];
   onProductSelect: (product: Product) => void;
+  onDeleteProduct: (productId: string) => void;
 }
 
-const ProductList: React.FC<ProductListProps> = ({ products, onProductSelect }) => {
+const ProductList: React.FC<ProductListProps> = ({ products, onProductSelect, onDeleteProduct }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  const handleDeleteClick = (productId: string) => {
+    if (confirmDelete === productId) {
+      onDeleteProduct(productId);
+      setConfirmDelete(null);
+    } else {
+      setConfirmDelete(productId);
+    }
+  };
 
   const filteredAndSortedProducts = useMemo(() => {
     return products
@@ -36,14 +48,22 @@ const ProductList: React.FC<ProductListProps> = ({ products, onProductSelect }) 
       <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
         {filteredAndSortedProducts.length > 0 ? (
           filteredAndSortedProducts.map(product => (
-            <button
-              key={product.barcode}
-              onClick={() => onProductSelect(product)}
-              className="w-full text-left bg-gray-700/60 p-4 rounded-lg hover:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-brand-secondary"
-            >
-              <h3 className="font-semibold text-white">{product.name}</h3>
-              <p className="text-sm font-mono text-gray-400">{product.barcode}</p>
-            </button>
+            <div key={product.barcode} className="flex items-center space-x-2">
+              <button
+                onClick={() => onProductSelect(product)}
+                className="flex-grow text-left bg-gray-700/60 p-4 rounded-lg hover:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-brand-secondary"
+              >
+                <h3 className="font-semibold text-white">{product.name}</h3>
+                <p className="text-sm font-mono text-gray-400">{product.barcode}</p>
+              </button>
+              <button
+                onClick={() => handleDeleteClick(product.barcode)}
+                className={`p-2 rounded-full transition-colors ${confirmDelete === product.barcode ? 'bg-red-500 text-white' : 'bg-gray-600 text-gray-400 hover:bg-red-500 hover:text-white'}`}
+                aria-label={confirmDelete === product.barcode ? 'Confirm delete' : 'Delete product'}
+              >
+                <TrashIcon className="w-5 h-5" />
+              </button>
+            </div>
           ))
         ) : (
           <div className="text-center py-10">

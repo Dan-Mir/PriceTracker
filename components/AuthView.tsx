@@ -42,7 +42,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
     <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center text-white">
       <div className="w-full max-w-sm p-8 space-y-8 bg-gray-800 rounded-2xl shadow-lg animate-fade-in">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-brand-primary">PriceWise</h1>
+          <h1 className="text-4xl font-bold text-brand-primary">PriceTracker</h1>
           <p className="mt-2 text-gray-400">Your Personal Price Tracker</p>
         </div>
         <form className="space-y-6" onSubmit={handleSubmit}>

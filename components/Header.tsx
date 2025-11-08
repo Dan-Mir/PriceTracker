@@ -13,7 +13,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, onSetView, onLogout }) => 
   return (
     <header className="bg-gray-800 shadow-md p-4 flex justify-between items-center sticky top-0 z-40">
       <div className="flex items-center space-x-2">
-        <h1 className="text-2xl font-bold text-brand-primary">PriceWise</h1>
+        <h1 className="text-2xl font-bold text-brand-primary">PriceTracker</h1>
       </div>
       <nav className="flex items-center space-x-2">
         <button
