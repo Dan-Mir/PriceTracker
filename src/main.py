@@ -3,6 +3,9 @@ import time
 import threading
 import os
 import shutil
+import argparse
+from dotenv import load_dotenv
+load_dotenv()
 
 # Configurazione Paparazzo
 SCREENSHOT_DIR = "screenshots"
@@ -33,12 +36,13 @@ def paparazzi_cam(driver):
 def run_debug_session():
     global STOP_RECORDING
     
-    email = "danymirto8@gmail.com"
+    email = os.getenv("EUROSPIN_EMAIL")
     bot = EurospinParser()
     
     # Avviamo il thread di registrazione
-    recorder_thread = threading.Thread(target=paparazzi_cam, args=(bot.driver,))
-    recorder_thread.start()
+    if args.screenshots:
+        recorder_thread = threading.Thread(target=paparazzi_cam, args=(bot.driver,))
+        recorder_thread.start()
 
     try:
         # Eseguiamo il login
@@ -51,13 +55,19 @@ def run_debug_session():
     finally:
         # Fermiamo la registrazione
         STOP_RECORDING = True
-        recorder_thread.join()
+        if args.screenshots:
+            recorder_thread.join()
+            print("🎥 REGISTRAZIONE TERMINATA.")
+            # Creiamo lo ZIP
+            print("📦 Creazione archivio ZIP...")
+            shutil.make_archive('debug_video', 'zip', SCREENSHOT_DIR)
+            print(f"✅ FATTO! Scarica il file 'debug_video.zip' dalla cartella a sinistra.")
         bot.close()
         
-        # Creiamo lo ZIP
-        print("📦 Creazione archivio ZIP...")
-        shutil.make_archive('debug_video', 'zip', SCREENSHOT_DIR)
-        print(f"✅ FATTO! Scarica il file 'debug_video.zip' dalla cartella a sinistra.")
+        
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Esegui una sessione di debug con registrazione dello schermo.")
+    parser.add_argument('--screenshots', action='store_true', help="Abilita la registrazione dello schermo durante la sessione di debug.")
+    args = parser.parse_args()
     run_debug_session()

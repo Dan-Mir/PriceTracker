@@ -12,7 +12,11 @@ __pycache__/
 # Screenshots e Log
 screenshots/
 *.log
+debug_video.zip
 
 # Cartelle IDE
 .vscode/
 .idea/
+
+# Cookie sessions
+src/*.pkl

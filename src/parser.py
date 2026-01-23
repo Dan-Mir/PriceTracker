@@ -1,11 +1,12 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 import re
+import pickle
+import os
 from collections import deque
 from db import PriceDatabase
 
@@ -13,6 +14,7 @@ class EurospinParser:
     def __init__(self):
         self.store_url = "https://laspesaonline.eurospin.it"
         self.db = PriceDatabase()
+        self.cookie_file = "cookies.pkl" # File dove salviamo la sessione
         
         chrome_options = Options()
         chrome_options.add_argument('--headless')
@@ -33,6 +35,60 @@ class EurospinParser:
             "carrello", "checkout", "profile"
         ]
 
+    # --- GESTIONE COOKIE ---
+    def save_cookies(self):
+        """Salva i cookie su file per non dover rifare login"""
+        with open(self.cookie_file, 'wb') as file:
+            pickle.dump(self.driver.get_cookies(), file)
+        print("   🍪 Cookie salvati con successo!")
+
+    def load_cookies(self):
+        """Carica i cookie se esistono"""
+        if os.path.exists(self.cookie_file):
+            try:
+                with open(self.cookie_file, 'rb') as file:
+                    cookies = pickle.load(file)
+                    for cookie in cookies:
+                        # Selenium a volte fa i capricci col dominio, fix rapido
+                        if 'expiry' in cookie:
+                            del cookie['expiry']
+                        try: self.driver.add_cookie(cookie)
+                        except: pass
+                print("   🍪 Cookie caricati. Provo a ripristinare la sessione...")
+                return True
+            except Exception as e:
+                print(f"   ⚠️ Errore caricamento cookie: {e}")
+        return False
+    
+    def _verifica_sessione_valida(self):
+        """Verifica se la sessione corrente mostra i prezzi (sessione valida)"""
+        try:
+            # Visita una pagina prodotti nota per testare
+            test_url = f"{self.store_url}/frutta-e-verdura"
+            print("   🔍 Verifico validità sessione...")
+            self.driver.get(test_url)
+            time.sleep(4)
+            
+            # Scroll per triggerare lazy loading
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(2)
+            
+            # Cerco prezzi sulla pagina
+            prices = self.driver.find_elements(By.XPATH, "//*[contains(text(), '€')]")
+            if not prices:
+                prices = self.driver.find_elements(By.CSS_SELECTOR, ".price, .prezzo, [class*='price'], [class*='prezzo']")
+            
+            if len(prices) > 0:
+                print(f"   ✅ Sessione valida - {len(prices)} prezzi visibili")
+                return True
+            else:
+                print("   ❌ Sessione non valida - nessun prezzo visibile")
+                return False
+        except Exception as e:
+            print(f"   ⚠️ Errore verifica sessione: {e}")
+            return False
+    # -----------------------
+
     def _clean_price(self, price_str):
         if not price_str: return 0.0
         clean = price_str.replace('€', '').replace(' ', '').replace(',', '.')
@@ -43,14 +99,37 @@ class EurospinParser:
             return 0.0
 
     def _is_weight(self, text):
-        """Ritorna True se la stringa sembra un peso (es. 200g, 1kg, 500ml)"""
-        # Regex per pesi comuni
         pattern = r'^\d+\s*[.,]?\s*\d*\s*(g|kg|ml|l|lt|cl|pz|pezz[oi])\s*e?$'
         return re.match(pattern, text.strip(), re.IGNORECASE) is not None
 
     def login_interattivo(self, email):
         print("\n🔐 --- INIZIO LOGIN ---")
+        
+        # 1. Naviga sul dominio (necessario prima di caricare i cookie)
         self.driver.get(self.store_url)
+        time.sleep(2)
+
+        # 2. TENTA LOGIN CON COOKIE
+        if self.load_cookies():
+            self.driver.refresh()
+            time.sleep(5)
+            
+            # Verifica se la sessione è valida (mostra i prezzi)
+            if self._verifica_sessione_valida():
+                print("   🎉 SESSIONE RIPRISTINATA! Salto il login manuale.")
+                self.naviga_e_salva()
+                return True
+            else:
+                print("   ⚠️ Cookie presenti ma sessione scaduta. Elimino cookie e rifaccio login.")
+                # Elimina cookie non validi
+                if os.path.exists(self.cookie_file):
+                    os.remove(self.cookie_file)
+                    print("   🗑️ Cookie eliminati.")
+                # Ricarica la pagina per partire da zero
+                self.driver.get(self.store_url)
+                time.sleep(2)
+
+        # 3. LOGIN MANUALE (Se cookie falliscono o non esistono)
         wait = WebDriverWait(self.driver, 25)
 
         try:
@@ -114,11 +193,15 @@ class EurospinParser:
             return False
             
         print("   🎉 LOGIN RIUSCITO!")
+        
+        # 4. SALVA I COOKIE PER LA PROSSIMA VOLTA
+        self.save_cookies()
+        
         self.naviga_e_salva()
         return True
 
     def naviga_e_salva(self):
-        print("\n🥦 --- INIZIO CRAWLER V5 (Smart Filtering) ---")
+        print("\n🥦 --- INIZIO CRAWLER ---")
         time.sleep(3)
         
         try:
@@ -129,7 +212,7 @@ class EurospinParser:
         queue = deque()
         visited = set()
         
-        # 1. Recupero Categorie Iniziali
+        # Recupero categorie iniziali dal menu
         try:
             links = self.driver.find_elements(By.CSS_SELECTOR, "nav.v-navigation-drawer .category2 a")
             main_links = self.driver.find_elements(By.CSS_SELECTOR, "nav.v-navigation-drawer a.menu-link")
@@ -146,8 +229,7 @@ class EurospinParser:
         except Exception as e:
             print(f"   ❌ Errore menu: {e}")
 
-        # 2. Crawler Loop
-        max_iter = 50 # Aumentato per coprire più terreno
+        max_iter = 60 
         iter_count = 0
         
         while queue and iter_count < max_iter:
@@ -157,12 +239,16 @@ class EurospinParser:
             print(f"\n   🚀 [{iter_count}/{max_iter}] Visito: {nome_cat}")
             try:
                 self.driver.get(url)
-                time.sleep(3)
+                time.sleep(5)  # Aumento attesa per caricamento JS
                 
-                # A. Scraping Prodotti
+                # Scroll per triggerare lazy loading
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)
+                self.driver.execute_script("window.scrollTo(0, 0);")
+                time.sleep(1)
+                
                 prodotti_trovati = self.scrape_current_page(nome_cat)
                 
-                # B. Se è una pagina "di snodo" (pochi prodotti, forse categorie)
                 if prodotti_trovati < 2:
                     new_links = self.find_subcategories_in_body()
                     added = 0
@@ -171,13 +257,7 @@ class EurospinParser:
                             queue.append((nh, f"{nome_cat} > {nt}")) 
                             visited.add(nh)
                             added += 1
-                    
-                    if added > 0:
-                        print(f"      🔗 Aggiunte {added} sottocategorie.")
-                    else:
-                        print("      ⚠️ Nessun prodotto e nessuna sottocategoria.")
                 else:
-                    # C. Paginazione (Solo se è una pagina prodotti vera)
                     page = 1
                     while self.go_next_page():
                         page += 1
@@ -191,26 +271,23 @@ class EurospinParser:
     def _is_valid_category_url(self, url, text):
         if not url or "javascript" in url: return False
         if len(text) < 2: return False
-        
         u = url.lower()
         t = text.lower()
-        
         for bad in self.BLACKLIST_URL:
             if bad in u or bad in t: return False
-            
         if "eurospin.it" not in u: return False
-        
-        # CRUCIALE: Evitiamo URL che sembrano prodotti specifici
-        # Spesso hanno pattern numerici complessi o /p/ invece di /c/
-        # Eurospin url: .../frutta-e-verdura (ok) vs .../frutta-e-verdura/banane-12345 (no)
-        # Se l'URL finisce con un codice numerico lungo, spesso è un prodotto
         if re.search(r'-\d{6,}$', u): return False 
-        
         return True
 
     def scrape_current_page(self, categoria):
-        # Cerca card che contengono prezzo
+        # Provo diversi selettori per trovare i prezzi
         prices = self.driver.find_elements(By.XPATH, "//*[contains(text(), '€')]")
+        
+        # Se XPath fallisce, provo con CSS selectors comuni
+        if not prices:
+            prices = self.driver.find_elements(By.CSS_SELECTOR, ".price, .prezzo, [class*='price'], [class*='prezzo']")
+        
+        print(f"      🔍 Trovati {len(prices)} elementi con €")
         if not prices: return 0
         
         count = 0
@@ -220,7 +297,7 @@ class EurospinParser:
             if not p.is_displayed(): continue
             try:
                 card = p
-                # Risalita intelligente: cerchiamo un contenitore che abbia senso
+                # Risalita intelligente
                 for _ in range(6):
                     try: card = card.find_element(By.XPATH, "./..")
                     except: break
@@ -231,37 +308,40 @@ class EurospinParser:
                     lines = [l.strip() for l in txt.split('\n') if l.strip()]
                     
                     if len(lines) < 2: continue 
-                    
-                    # Se c'è scritto "Totale", "Carrello" -> scarta
                     if any(x in txt.lower() for x in ["totale", "carrello", "riepilogo"]): break
 
-                    # Check prezzo
                     matches = re.findall(r'\d+[.,]\d+\s?€', txt)
                     if not matches: continue
                     price_val = self._clean_price(matches[0])
                     if price_val < 0.1: break 
                     
-                    # ESTRAZIONE NOME MIGLIORATA
                     nome_prodotto = "N/D"
+                    marca = ""  # Marca vuota per ora, da implementare estrazione
+                    
                     for line in lines:
                         low = line.lower()
-                        # Scarta se: è prezzo, è peso, è "aggiungi", è "al kg"
                         if "€" in line and any(c.isdigit() for c in line): continue
                         if self._is_weight(line): continue
                         if "aggiungi" in low or "al kg" in low or "al pz" in low: continue
                         if len(line) < 3: continue
                         
-                        # Se sopravvive, è il nome (o la marca)
+                        # Euristiche per capire se è una marca (spesso in maiuscolo o breve)
+                        # Per ora prendiamo la prima riga valida come nome prodotto
                         nome_prodotto = line
+                        
+                        # TODO: Implementare estrazione marca dalle righe successive
                         break
                     
                     if nome_prodotto != "N/D":
-                        # print(f"DEBUG: {nome_prodotto} - {price_val}")
-                        self.db.insert_product(nome_prodotto, "Eurospin", price_val, price_val, categoria)
+                        print(f"      💾 Salvo: {nome_prodotto} - €{price_val}")
+                        self.db.insert_product(nome_prodotto, marca, price_val, price_val, categoria, "Eurospin")
+                        
                         processed_cards.append(card)
                         count += 1
                         break 
-            except: continue
+            except Exception as e:
+                print(f"      ⚠️ Errore parsing card: {e}")
+                continue
             
         if count > 0: print(f"      ✅ Trovati {count} prodotti.")
         return count
@@ -269,19 +349,12 @@ class EurospinParser:
     def find_subcategories_in_body(self):
         links = []
         try:
-            # Cerchiamo link nel corpo, MA ESCLUDIAMO quelli dentro le card prodotto
-            # Strategia: cerchiamo i link, poi controlliamo se il loro genitore ha un prezzo "vicino"
             candidates = self.driver.find_elements(By.CSS_SELECTOR, ".v-main a[href]")
-            
             for l in candidates:
                 if not l.is_displayed(): continue
                 h = l.get_attribute("href")
                 t = l.get_attribute("innerText").strip()
-                
-                # Controllo se è una categoria valida
                 if self._is_valid_category_url(h, t):
-                    # Check Extra: Se il link contiene un'immagine piccola, o testo "Aggiungi" vicino..
-                    # Per semplicità, ci fidiamo del filtro regex sugli URL
                     if (h, t) not in links:
                         links.append((h, t))
         except: pass
