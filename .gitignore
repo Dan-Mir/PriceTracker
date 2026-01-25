@@ -11,6 +11,7 @@ __pycache__/
 
 # Screenshots e Log
 screenshots/
+logs/
 *.log
 debug_video.zip
 
@@ -20,3 +21,6 @@ debug_video.zip
 
 # Cookie sessions
 src/*.pkl
+
+# Configurations
+*.deb*

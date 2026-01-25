@@ -19,7 +19,38 @@ Un crawler avanzato basato su **Selenium** per estrarre automaticamente il catal
 * **📊 Database Normalizzato:** Schema relazionale con tracking storico prezzi e offerte automatiche
 * **⏱️ Timestamp Intelligenti:** Tracciamento automatico prima registrazione e ultimo update per prodotto
 * **🤖 Automazione:** Supporto Windows Task Scheduler e Python scheduler per esecuzione periodica
-* **🧪 Test Coverage:** Suite completa di 25 test unitari e integrazione
+* **🧪 Test Coverage:** Suite completa di test unitari e integrazione
+* **🆕 Fuzzy Matching:** Riconoscimento intelligente prodotti simili (es. "Latte 1L" = "LATTE INTERO 1000ML")
+* **🆕 Estrazione Marca e Unità:** Parsing automatico marca e unità di misura dai prodotti
+* **🆕 Logging Strutturato:** Sistema professionale di logging con rotazione automatica file
+* **🆕 Rate Limiting:** Protezione anti-ban con delay casuali tra richieste
+
+---
+
+## 🆕 Novità - Refactoring Fase 1 (Gennaio 2026)
+
+**Il progetto è stato completamente refactorizzato! Nuove funzionalità:**
+
+✅ **Sistema di Configurazione Centralizzato** (`src/config.py`)
+- Tutti i parametri in un unico file
+- Facile personalizzazione timeout, delay, soglie
+
+✅ **Logging Professionale** (`src/logger.py`)
+- Rotazione automatica file log (10MB, 5 backup)
+- Livelli configurabili (DEBUG, INFO, WARNING, ERROR)
+- Output su file e console
+
+✅ **Normalizzazione Prodotti** (`src/normalizer.py`)
+- Fuzzy matching con soglia configurabile
+- Estrazione intelligente marca e unità misura
+- Gestione sinonimi e varianti
+
+✅ **Gestione Errori Robusta** (`src/utils.py`)
+- Retry automatico con exponential backoff
+- Rate limiting anti-ban
+- Decorator per operazioni sicure
+
+**📖 Documentazione completa:** [REFACTORING_FASE1.md](REFACTORING_FASE1.md) | [SUMMARY_FASE1.md](SUMMARY_FASE1.md)
 
 ---
 
@@ -31,6 +62,10 @@ supermarket_parser/
 │   ├── main.py           # Entry point dello script
 │   ├── parser.py         # Web scraper con Selenium + BFS crawler
 │   ├── db.py             # Database layer con schema normalizzato
+│   ├── config.py         # 🆕 Configurazione centralizzata
+│   ├── logger.py         # 🆕 Sistema logging strutturato
+│   ├── normalizer.py     # 🆕 Normalizzazione e fuzzy matching prodotti
+│   ├── utils.py          # 🆕 Utilities (retry, rate limiting)
 │   ├── scheduler.py      # Automazione Python (cron-like)
 │   ├── show_db.py        # Visualizza contenuto database
 │   ├── show_offers.py    # Mostra prodotti in offerta
@@ -40,10 +75,15 @@ supermarket_parser/
 │   ├── test_parser_utils.py  # Test parsing utilities
 │   ├── test_integration.py   # Test integrazione
 │   └── run_tests.py      # Test runner
+├── logs/                 # 🆕 Directory log (auto-creata)
+│   └── scraper.log       # File di log con rotazione
 ├── README.md             # Documentazione principale
+├── REFACTORING_FASE1.md  # 🆕 Dettagli refactoring Fase 1
+├── SUMMARY_FASE1.md      # 🆕 Riepilogo refactoring
 ├── AUTOMAZIONE.md        # Guida setup automazione
 ├── SUPERMERCATI.md       # Roadmap multi-supermercato
-├── requirements.txt      # Dipendenze Python
+├── requirements.txt      # Dipendenze Python (aggiornato)
+├── test_refactoring.py   # 🆕 Test suite refactoring
 ├── run_scraping.bat      # Script Windows per Task Scheduler
 └── .gitignore            # File esclusi da git
 ```

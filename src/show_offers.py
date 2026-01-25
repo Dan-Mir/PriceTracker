@@ -2,6 +2,9 @@
 Script per visualizzare i prodotti in offerta dal database
 """
 from db import PriceDatabase
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 def mostra_offerte():
     db = PriceDatabase()

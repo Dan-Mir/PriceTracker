@@ -3,10 +3,20 @@ from datetime import datetime
 import os
 import hashlib
 
+try:
+    from logger import get_logger
+    import config
+except ImportError:
+    from src.logger import get_logger
+    from src import config
+
+logger = get_logger(__name__)
+
 class PriceDatabase:
-    def __init__(self, db_name="prezzi.db"):
+    def __init__(self, db_name=None):
+        db_name = db_name or config.DATABASE_NAME
         self.db_path = os.path.abspath(db_name)
-        print(f"💾 Database path: {self.db_path}")
+        logger.info(f"Database path: {self.db_path}")
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.execute("PRAGMA foreign_keys = ON")  # Abilita foreign keys
         self.create_tables()
@@ -170,6 +180,7 @@ class PriceDatabase:
     
     def insert_product(self, nome, marca, p_listino, p_offerta, categoria, supermercato="Eurospin"):
         """DEPRECATO: Usa upsert_product(). Mantenuto per backward compatibility"""
+        logger.warning("insert_product è deprecato, usa upsert_product()")
         return self.upsert_product(nome, marca, p_listino, p_offerta, categoria, supermercato)
     
     def get_products_in_offer(self, supermercato=None, min_sconto=0):
@@ -246,6 +257,110 @@ class PriceDatabase:
             (datetime.now(), nome_supermercato)
         )
         self.conn.commit()
+    
+    def search_products(self, query: str, supermercato: str = None, limit: int = 10):
+        """
+        Cerca prodotti per nome (con LIKE) e fuzzy matching
+        
+        Args:
+            query: Testo da cercare
+            supermercato: Filtra per supermercato (opzionale)
+            limit: Numero massimo risultati
+        
+        Returns:
+            Lista di dict con prodotti trovati
+        """
+        sql = '''
+            SELECT p.nome, p.marca, p.unita_misura, pr.prezzo_attuale, s.nome as supermercato
+            FROM prodotti p
+            JOIN prezzi pr ON p.id = pr.prodotto_id
+            JOIN supermercati s ON pr.supermercato_id = s.id
+            WHERE p.nome LIKE ?
+              AND pr.id IN (
+                  SELECT MAX(id) FROM prezzi GROUP BY prodotto_id, supermercato_id
+              )
+        '''
+        
+        params = [f'%{query}%']
+        
+        if supermercato:
+            sql += ' AND s.nome = ?'
+            params.append(supermercato)
+        
+        sql += ' ORDER BY pr.prezzo_attuale ASC LIMIT ?'
+        params.append(limit)
+        
+        cursor = self.conn.execute(sql, params)
+        
+        results = []
+        for row in cursor.fetchall():
+            results.append({
+                'nome': row[0],
+                'marca': row[1],
+                'unita_misura': row[2],
+                'prezzo': row[3],
+                'supermercato': row[4]
+            })
+        
+        return results
+    
+    def get_all_supermarkets(self):
+        """Ottiene lista di tutti i supermercati nel database"""
+        cursor = self.conn.execute("SELECT DISTINCT nome FROM supermercati ORDER BY nome")
+        return [row[0] for row in cursor.fetchall()]
+    
+    def get_products_in_offer(self, min_sconto: float = 5.0, limit: int = 20):
+        """
+        Ottiene prodotti in offerta
+        
+        Args:
+            min_sconto: Sconto minimo percentuale
+            limit: Numero massimo risultati
+        
+        Returns:
+            Lista di tuple (nome, marca, prezzo_listino, prezzo_attuale, sconto, supermercato)
+        """
+        sql = '''
+            SELECT p.nome, p.marca, pr.prezzo_listino, pr.prezzo_attuale, 
+                   pr.sconto_percentuale, s.nome as supermercato
+            FROM prodotti p
+            JOIN prezzi pr ON p.id = pr.prodotto_id
+            JOIN supermercati s ON pr.supermercato_id = s.id
+            WHERE pr.in_offerta = 1
+              AND pr.sconto_percentuale >= ?
+              AND pr.id IN (
+                  SELECT MAX(id) FROM prezzi GROUP BY prodotto_id, supermercato_id
+              )
+            ORDER BY pr.sconto_percentuale DESC
+            LIMIT ?
+        '''
+        
+        cursor = self.conn.execute(sql, (min_sconto, limit))
+        return cursor.fetchall()
+    
+    def get_price_history(self, nome_prodotto: str, limit: int = 30):
+        """
+        Ottiene lo storico prezzi di un prodotto
+        
+        Args:
+            nome_prodotto: Nome del prodotto
+            limit: Numero massimo rilevazioni
+        
+        Returns:
+            Lista di tuple (prezzo_attuale, data_rilevazione, supermercato)
+        """
+        sql = '''
+            SELECT pr.prezzo_attuale, pr.data_rilevazione, s.nome as supermercato
+            FROM prodotti p
+            JOIN prezzi pr ON p.id = pr.prodotto_id
+            JOIN supermercati s ON pr.supermercato_id = s.id
+            WHERE p.nome LIKE ?
+            ORDER BY pr.data_rilevazione DESC
+            LIMIT ?
+        '''
+        
+        cursor = self.conn.execute(sql, (f'%{nome_prodotto}%', limit))
+        return cursor.fetchall()
 
     def close(self):
         self.conn.close()

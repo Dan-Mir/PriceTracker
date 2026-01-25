@@ -1,0 +1,14 @@
+# Lista della spesa - esempio
+# Una riga = un prodotto
+# Righe che iniziano con # sono commenti (ignorate)
+
+latte
+pane
+pasta
+olio
+pomodoro
+mozzarella
+prosciutto
+yogurt
+biscotti
+acqua

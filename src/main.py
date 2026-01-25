@@ -5,10 +5,14 @@ import os
 import shutil
 import argparse
 from dotenv import load_dotenv
-load_dotenv()
+from logger import get_logger
+import config
+
+load_dotenv("../.env")
+logger = get_logger(__name__)
 
 # Configurazione Paparazzo
-SCREENSHOT_DIR = "screenshots"
+SCREENSHOT_DIR = config.SCREENSHOT_DIR
 STOP_RECORDING = False
 
 def paparazzi_cam(driver):
@@ -21,7 +25,7 @@ def paparazzi_cam(driver):
         os.remove(os.path.join(SCREENSHOT_DIR, f))
 
     count = 0
-    print("🎥 REGISTRAZIONE AVVIATA (3 fps)...")
+    logger.info("REGISTRAZIONE SCREENSHOT AVVIATA (3 fps)...")
     
     while not STOP_RECORDING:
         try:
@@ -36,7 +40,11 @@ def paparazzi_cam(driver):
 def run_debug_session():
     global STOP_RECORDING
     
-    email = os.getenv("EUROSPIN_EMAIL")
+    email = config.EUROSPIN_EMAIL
+    if not email:
+        logger.error("EUROSPIN_EMAIL non configurata nel file .env")
+        return
+    
     bot = EurospinParser()
     
     # Avviamo il thread di registrazione
@@ -47,21 +55,21 @@ def run_debug_session():
     try:
         # Eseguiamo il login
         bot.login_interattivo(email)
-        print("✅ Script terminato.")
+        logger.info("Script terminato con successo")
         
     except Exception as e:
-        print(f"❌ Errore nello script: {e}")
+        logger.error(f"Errore durante esecuzione: {e}", exc_info=True)
         
     finally:
         # Fermiamo la registrazione
         STOP_RECORDING = True
         if args.screenshots:
             recorder_thread.join()
-            print("🎥 REGISTRAZIONE TERMINATA.")
+            logger.info("REGISTRAZIONE SCREENSHOT TERMINATA")
             # Creiamo lo ZIP
-            print("📦 Creazione archivio ZIP...")
+            logger.info("Creazione archivio ZIP...")
             shutil.make_archive('debug_video', 'zip', SCREENSHOT_DIR)
-            print(f"✅ FATTO! Scarica il file 'debug_video.zip' dalla cartella a sinistra.")
+            logger.info("FATTO! Scarica il file 'debug_video.zip'")
         bot.close()
         
         
