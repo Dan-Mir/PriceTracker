@@ -13,12 +13,13 @@ Un crawler avanzato basato su **Selenium** per estrarre automaticamente il catal
 
 ## ✨ Funzionalità Chiave
 
-* **🕵️‍♂️ Navigazione Intelligente (BFS):** Utilizza un algoritmo Breadth-First Search per scansionare categorie e sottocategorie senza rimanere bloccato in loop infiniti.
-* **🍪 Session Persistence:** Gestione automatica dei cookie (`cookies.pkl`) per evitare di richiedere l'OTP ad ogni avvio.
-* **⚡ Shadow DOM Bypass:** Tecniche di injection JavaScript per interagire con elementi nascosti all'interno di componenti Salesforce/LWC.
-* **🧹 Smart Cleaning:** Filtri regex avanzati per distinguere nomi prodotti, pesi e spazzatura (es. "Totale Carrello").
-* **💾 Database SQLite:** Salvataggio strutturato e leggero dei dati in locale.
-* **🔄 Paginazione Automatica:** Scorre tutte le pagine di una categoria fino all'ultimo prodotto.
+* **🕵️‍♂️ Navigazione Intelligente (BFS):** Algoritmo Breadth-First Search per scansionare categorie senza loop infiniti
+* **🔐 Session Persistence Completa:** Cookie + localStorage + sessionStorage per login automatico (~7 giorni senza OTP)
+* **⚡ Shadow DOM Bypass:** JavaScript injection per elementi Salesforce/LWC nascosti
+* **📊 Database Normalizzato:** Schema relazionale con tracking storico prezzi e offerte automatiche
+* **⏱️ Timestamp Intelligenti:** Tracciamento automatico prima registrazione e ultimo update per prodotto
+* **🤖 Automazione:** Supporto Windows Task Scheduler e Python scheduler per esecuzione periodica
+* **🧪 Test Coverage:** Suite completa di 25 test unitari e integrazione
 
 ---
 
@@ -27,16 +28,24 @@ Un crawler avanzato basato su **Selenium** per estrarre automaticamente il catal
 ```text
 supermarket_parser/
 ├── src/
-│   ├── main.py          # Entry point dello script
-│   ├── parser.py        # Logica del crawler e scraping (Selenium)
-│   ├── db.py            # Gestione connessione e query SQLite
-│   ├── show_db.py       # Script di utility per visualizzare i dati
-│   └── clean_db.py      # Script per pulire il database
-├── prezzi.db            # Database SQLite (generato automaticamente)
-├── cookies.pkl          # Cookie di sessione (generato al primo login)
-├── requirements.txt     # Dipendenze Python
-├── setup_colab.sh       # Script di installazione per Google Colab/Linux
-└── README.md            # Documentazione
+│   ├── main.py           # Entry point dello script
+│   ├── parser.py         # Web scraper con Selenium + BFS crawler
+│   ├── db.py             # Database layer con schema normalizzato
+│   ├── scheduler.py      # Automazione Python (cron-like)
+│   ├── show_db.py        # Visualizza contenuto database
+│   ├── show_offers.py    # Mostra prodotti in offerta
+│   └── clean_db.py       # Pulizia database
+├── tests/
+│   ├── test_db.py        # Test database operations
+│   ├── test_parser_utils.py  # Test parsing utilities
+│   ├── test_integration.py   # Test integrazione
+│   └── run_tests.py      # Test runner
+├── README.md             # Documentazione principale
+├── AUTOMAZIONE.md        # Guida setup automazione
+├── SUPERMERCATI.md       # Roadmap multi-supermercato
+├── requirements.txt      # Dipendenze Python
+├── run_scraping.bat      # Script Windows per Task Scheduler
+└── .gitignore            # File esclusi da git
 ```
 
 ---
@@ -52,17 +61,25 @@ supermarket_parser/
 ### 1. Clona la repository
 
 ```bash
-git clone https://github.com/IL_TUO_USERNAME/eurospin-scraper.git
-cd eurospin-scraper
+git clone https://github.com/TUO_USERNAME/supermarket_parser.git
+cd supermarket_parser
 ```
 
-### 2. Installa le dipendenze
-
-È consigliato usare un virtual environment:
+### 2. Crea virtual environment
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Su Windows: .venv\Scripts\activate
+
+# Linux/Mac/Raspberry Pi
+source .venv/bin/activate
+
+# Windows
+.venv\Scripts\activate
+```
+
+### 3. Installa dipendenze
+
+```bash
 pip install -r requirements.txt
 ```
 
@@ -70,74 +87,130 @@ pip install -r requirements.txt
 
 ## 💻 Utilizzo
 
-### Primo Avvio (Login & Setup)
-
-La prima volta che esegui lo script, dovrai effettuare il login manuale per generare i cookie di sessione.
-
-1. Assicurati di avere le credenziali (email) configurate o inseriscile quando richiesto.
-2. Esegui lo script:
+### Primo Avvio (Login OTP)
 
 ```bash
-python src/main.py
+cd src
+python main.py
 ```
 
-3. Il browser si aprirà (o lavorerà in headless). Inserisci il codice OTP ricevuto via email nel terminale quando richiesto.
-4. Una volta loggato, lo script salverà `cookies.pkl` e inizierà il crawling.
+1. Inserisci email quando richiesto
+2. Ricevi OTP via email
+3. Inserisci codice OTP nel terminale
+4. **Sessione salvata** (cookie + localStorage + sessionStorage) → valida ~7 giorni
 
-### Esecuzioni Successive
-
-Rilanciando `python src/main.py`, lo script caricherà i cookie salvati e salterà la procedura di login, iniziando immediatamente a scaricare i prezzi.
-
-### Modalità Debug con Screenshots
-
-Per registrare screenshot durante l'esecuzione (utile per debugging):
+### Esecuzioni Successive (SENZA OTP)
 
 ```bash
-python src/main.py --screenshots
+python main.py  # Login automatico, nessun OTP richiesto
 ```
 
-Questo genererà un file `debug_video.zip` con tutti gli screenshot catturati.
+### Automazione
 
-### Verifica dei Dati
+**Windows (Task Scheduler):**
+```powershell
+# Test manuale
+.\run_scraping.bat
 
-Per vedere cosa è stato salvato nel database:
+# Setup automatico (vedi AUTOMAZIONE.md)
+```
+
+**Linux/Raspberry Pi (cron):**
+```bash
+# Esecuzione giornaliera ore 3:00
+crontab -e
+# Aggiungi: 0 3 * * * /path/to/.venv/bin/python /path/to/src/main.py >> /path/to/scraping.log 2>&1
+```
+
+**Python Scheduler:**
+```bash
+cd src
+python scheduler.py  # Loop continuo con scheduling configurabile
+```
+
+### Visualizza Dati
 
 ```bash
+# Statistiche database
 python src/show_db.py
+
+# Prodotti in offerta
+python src/show_offers.py
+
+# Pulizia database
+python src/clean_db.py
+```
+
+### Test Suite
+
+```bash
+cd tests
+python run_tests.py  # Esegue 25 test (database, parser, integrazione)
 ```
 
 ---
 
 ## 🗄️ Schema Database
 
-Il file `prezzi.db` contiene una tabella `prodotti` con la seguente struttura:
+Database SQLite normalizzato con 3 tabelle:
 
-| Colonna              | Tipo     | Descrizione                                                    |
-|----------------------|----------|----------------------------------------------------------------|
-| `id`                 | INTEGER  | Identificativo univoco (PK)                                    |
-| `nome`               | TEXT     | Nome del prodotto (es. "Arance Navel")                        |
-| `marca`              | TEXT     | Marca del prodotto (vuota se non rilevata)                    |
-| `prezzo_listino`     | REAL     | Prezzo pieno (uguale a offerta se non scontato)               |
-| `prezzo_offerta`     | REAL     | Prezzo attuale di vendita                                      |
-| `unita_misura`       | TEXT     | Unità di misura (es. "kg", "pz")                              |
-| `categoria`          | TEXT     | Categoria di appartenenza (es. "Frutta e Verdura > Frutta")  |
-| `supermercato`       | TEXT     | Nome del supermercato ("Eurospin")                            |
-| `data_aggiornamento` | DATETIME | Timestamp dell'ultima scansione                                |
+### Tabella `prodotti`
+| Colonna | Tipo | Descrizione |
+|---------|------|-------------|
+| `id` | INTEGER | Primary key |
+| `nome` | TEXT | Nome prodotto |
+| `marca` | TEXT | Marca (nullable) |
+| `categoria` | TEXT | Categoria/sottocategoria |
+| `unita_misura` | TEXT | Peso/unità (es. "500g", "1L") |
+| `codice_prodotto` | TEXT | Hash MD5 univoco (nome+marca+unità) |
+| `data_creazione` | DATETIME | **Timestamp prima registrazione** |
+| `data_ultimo_update` | DATETIME | **Timestamp ultimo scraping** |
+
+### Tabella `prezzi`
+| Colonna | Tipo | Descrizione |
+|---------|------|-------------|
+| `id` | INTEGER | Primary key |
+| `prodotto_id` | INTEGER | FK → prodotti |
+| `supermercato_id` | INTEGER | FK → supermercati |
+| `prezzo_listino` | REAL | Prezzo pieno |
+| `prezzo_attuale` | REAL | Prezzo di vendita |
+| `in_offerta` | BOOLEAN | True se scontato |
+| `sconto_percentuale` | REAL | % sconto calcolato |
+| `data_rilevazione` | DATETIME | Timestamp rilevazione |
+
+### Tabella `supermercati`
+| Colonna | Tipo | Descrizione |
+|---------|------|-------------|
+| `id` | INTEGER | Primary key |
+| `nome` | TEXT | Nome supermercato (UNIQUE) |
+| `citta` | TEXT | Località (nullable) |
+| `ultimo_scraping` | DATETIME | Timestamp ultimo scraping |
+
+### Logica Upsert Intelligente
+- **Nuovo prodotto**: Inserimento con `data_creazione = NOW()`
+- **Prodotto esistente**: Update solo `data_ultimo_update = NOW()`
+- **Nuovo record prezzo**: Solo se prezzo cambiato O passate >24h
+- **Rilevamento offerte**: Automatico se `prezzo_attuale < prezzo_listino`
 
 ---
 
-## 🗺️ Roadmap & Futuro
+## 🗺️ Roadmap
 
-- [x] Crawler base e paginazione
-- [x] Login persistente con cookie
-- [x] Salvataggio su SQLite
-- [x] Gestione sessioni con cookie persistence
-- [ ] Containerizzazione Docker per deployment su Raspberry Pi
-- [ ] API Server (Flask/FastAPI) per esporre i dati in formato JSON
-- [ ] Integrazione Home Assistant: Creazione di sensori per monitorare offerte specifiche
-- [ ] Supporto LLM: Integrazione con Gemma/Llama per query in linguaggio naturale ("Dove costa meno la pasta oggi?")
-- [ ] Estrazione automatica della marca dai nomi prodotto
-- [ ] Supporto multi-supermercato (Conad, Coop, ecc.)
+- [x] Crawler BFS con paginazione automatica
+- [x] Login persistente (cookie + localStorage + sessionStorage)
+- [x] Database normalizzato con storico prezzi
+- [x] Timestamp tracking (creazione + ultimo update)
+- [x] Rilevamento offerte automatico
+- [x] Suite completa di test (25 test)
+- [x] Automazione Windows/Linux
+- [ ] **Deploy su Raspberry Pi** ← Prossimo step
+- [ ] API REST (Flask/FastAPI) per esposizione dati
+- [ ] Dashboard web per visualizzazione offerte
+- [ ] Multi-supermercato (Lidl, Conad, Esselunga - vedi SUPERMERCATI.md)
+- [ ] Integrazione Home Assistant
+- [ ] Query LLM (Gemma/Llama) per consigli spesa
+
+Vedi [SUPERMERCATI.md](SUPERMERCATI.md) per roadmap dettagliata multi-store.
 
 ---
 

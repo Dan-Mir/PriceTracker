@@ -35,30 +35,77 @@ class EurospinParser:
             "carrello", "checkout", "profile"
         ]
 
-    # --- GESTIONE COOKIE ---
+    # --- GESTIONE SESSIONE COMPLETA ---
     def save_cookies(self):
-        """Salva i cookie su file per non dover rifare login"""
+        """Salva cookie + localStorage + sessionStorage per mantenere la sessione"""
+        # Salva tutto lo stato della sessione
+        session_data = {
+            'cookies': self.driver.get_cookies(),
+            'localStorage': self.driver.execute_script("return window.localStorage;"),
+            'sessionStorage': self.driver.execute_script("return window.sessionStorage;")
+        }
+        
         with open(self.cookie_file, 'wb') as file:
-            pickle.dump(self.driver.get_cookies(), file)
-        print("   🍪 Cookie salvati con successo!")
+            pickle.dump(session_data, file)
+        print("   🍪 Sessione completa salvata (cookie + storage)!")
 
     def load_cookies(self):
-        """Carica i cookie se esistono"""
-        if os.path.exists(self.cookie_file):
-            try:
-                with open(self.cookie_file, 'rb') as file:
-                    cookies = pickle.load(file)
-                    for cookie in cookies:
-                        # Selenium a volte fa i capricci col dominio, fix rapido
-                        if 'expiry' in cookie:
-                            del cookie['expiry']
-                        try: self.driver.add_cookie(cookie)
-                        except: pass
-                print("   🍪 Cookie caricati. Provo a ripristinare la sessione...")
-                return True
-            except Exception as e:
-                print(f"   ⚠️ Errore caricamento cookie: {e}")
-        return False
+        """Carica cookie + localStorage + sessionStorage salvati"""
+        if not os.path.exists(self.cookie_file):
+            print("   ⚠️ Nessun file sessione trovato.")
+            return False
+        
+        try:
+            with open(self.cookie_file, 'rb') as file:
+                session_data = pickle.load(file)
+                
+                # GESTISCI RETROCOMPATIBILITÀ: se è una lista, sono vecchi cookie
+                if isinstance(session_data, list):
+                    print("   ⚠️ File cookie vecchio formato - richiesto nuovo login")
+                    return False
+                
+                # Carica i cookie
+                cookies = session_data.get('cookies', [])
+                for cookie in cookies:
+                    # Rimuovi campi che possono dare problemi
+                    if 'expiry' in cookie:
+                        del cookie['expiry']
+                    if 'sameSite' in cookie:
+                        del cookie['sameSite']
+                    try:
+                        self.driver.add_cookie(cookie)
+                    except Exception as e:
+                        pass  # Alcuni cookie potrebbero fallire
+                
+                # Ripristina localStorage
+                local_storage = session_data.get('localStorage', {})
+                if local_storage:
+                    for key, value in local_storage.items():
+                        try:
+                            self.driver.execute_script(
+                                "window.localStorage.setItem(arguments[0], arguments[1]);",
+                                key, value
+                            )
+                        except:
+                            pass
+                
+                # Ripristina sessionStorage
+                session_storage = session_data.get('sessionStorage', {})
+                if session_storage:
+                    for key, value in session_storage.items():
+                        try:
+                            self.driver.execute_script(
+                                "window.sessionStorage.setItem(arguments[0], arguments[1]);",
+                                key, value
+                            )
+                        except:
+                            pass
+                
+            print("   🍪 Sessione ripristinata (cookie + localStorage + sessionStorage)")
+            return True
+        except Exception as e:
+            print(f"   ❌ Errore ripristino sessione: {e}")
+            return False
     
     def _verifica_sessione_valida(self):
         """Verifica se la sessione corrente mostra i prezzi (sessione valida)"""
@@ -111,10 +158,8 @@ class EurospinParser:
 
         # 2. TENTA LOGIN CON COOKIE
         if self.load_cookies():
-            self.driver.refresh()
-            time.sleep(5)
-            
-            # Verifica se la sessione è valida (mostra i prezzi)
+            # Dopo aver caricato i cookie, vai direttamente sulla pagina di test
+            # SENZA fare refresh (che potrebbe invalidare i cookie)
             if self._verifica_sessione_valida():
                 print("   🎉 SESSIONE RIPRISTINATA! Salto il login manuale.")
                 self.naviga_e_salva()
