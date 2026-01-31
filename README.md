@@ -18,9 +18,10 @@ Sistema automatico di scraping multi-supermercato per confronto prezzi e analisi
 
 **Funzionalità Principali:**
 - 🔄 Scraping automatico con paginazione intelligente
-- 🤖 Assistente LLM (Ollama/Gemma) per ricerca prodotti
+- 🤖 **Sistema ibrido AI**: FunctionGemma (locale) + Gemini API (cloud)
+- 🧠 Espansione keyword intelligente con categorie database
 - 📈 Database storico prezzi con tracking temporale
-- 🎯 Confronto prezzi multi-store
+- 🎯 Top 3 alternative per ogni prodotto con reasoning
 - ⏰ Automazione completa via cron job
 
 ---
@@ -41,8 +42,9 @@ source .venv/bin/activate
 # Installa dipendenze
 pip install -r requirements.txt
 
-# Configura email Eurospin
+# Configura variabili ambiente
 echo "EUROSPIN_EMAIL=tua.email@esempio.com" > .env
+echo "GEMINI_API_KEY=tua-api-key-gemini" >> .env
 ```
 
 ### Primo Utilizzo
@@ -54,11 +56,11 @@ echo "EUROSPIN_EMAIL=tua.email@esempio.com" > .env
 # 2. Visualizza database
 python src/show_db.py
 
-# 3. Cerca offerte
-python src/show_offers.py "pasta"
+# 3. Test sistema AI ibrido con lista spesa
+python test_lista_spesa.py
 
-# 4. Assistente LLM (richiede Ollama)
-python demo_llm.py
+# 4. Cerca offerte specifiche
+python src/show_offers.py "pasta"
 ```
 
 ---
@@ -97,23 +99,28 @@ grep -i error logs/*.log | tail -20
 ```
 supermarket_parser/
 ├── run_scraping.sh              # ⭐ Script automazione principale
+├── test_lista_spesa.py          # ⭐ Test sistema AI ibrido
+├── lista_spesa.txt              # Esempio lista della spesa
 ├── src/
-│   ├── scrape_all.py            # Orchestrator scraping multi-store
-│   ├── parser.py                # Parser Eurospin (Shadow DOM)
-│   ├── castoro_parser.py        # Parser Castoro (109 categorie + paginazione)
-│   ├── castoro_all_urls.py      # Lista URL categorie Castoro
-│   ├── db.py                    # Database SQLite manager
-│   ├── llm_interface.py         # Interfaccia LLM per ricerca intelligente
+│   ├── eurospin/
+│   │   └── parser.py            # Parser Eurospin (Shadow DOM)
+│   ├── castoro/
+│   │   ├── castoro_parser.py    # Parser Castoro (109 categorie)
+│   │   ├── castoro_all_urls.py  # URL categorie
+│   │   └── castoro_categories.txt
+│   ├── scrape_all.py            # Orchestrator multi-store
+│   ├── gemini_optimizer.py      # 🆕 Ottimizzatore ibrido AI
+│   ├── keyword_expander.py      # 🆕 Espansione categorie
+│   ├── db.py                    # Database SQLite + ricerca avanzata
+│   ├── llm_interface.py         # Interfaccia FunctionGemma
 │   ├── config.py                # Configurazione centralizzata
-│   ├── normalizer.py            # Normalizzazione prodotti/fuzzy matching
+│   ├── normalizer.py            # Fuzzy matching prodotti
 │   ├── utils.py                 # Utilities (retry, rate limiting)
-│   ├── show_db.py               # Visualizza contenuto database
-│   └── show_offers.py           # Cerca migliori offerte
-├── tests/                       # Test e script di debug
-│   ├── debug_scripts/           # Script esplorazione/debug
-│   └── run_tests.py             # Esecuzione test suite
-├── logs/                        # Log di scraping
-└── README.md                    # Questa documentazione
+│   ├── show_db.py               # Visualizza database
+│   └── show_offers.py           # Cerca offerte
+├── tests/                       # Test e debug scripts
+├── logs/                        # Log scraping
+└── README.md                    # Documentazione
 ```
 
 ---
@@ -126,9 +133,12 @@ supermarket_parser/
 # Email per login Eurospin (obbligatorio)
 EUROSPIN_EMAIL=tua.email@esempio.com
 
-# LLM (opzionale - richiede Ollama installato)
+# Gemini API per sistema ibrido (obbligatorio)
+GEMINI_API_KEY=your-gemini-api-key
+
+# Ollama locale (opzionale - già incluso)
 OLLAMA_API_URL=http://localhost:11434
-OLLAMA_MODEL=functiongemma:2b
+OLLAMA_MODEL=functiongemma:270m
 ```
 
 ### Parametri Scraping (src/config.py)
@@ -149,43 +159,63 @@ MAX_PAGINATION_PAGES = 20       # Massimo pagine per categoria
 
 ---
 
-## 🤖 Assistente LLM
+## 🤖 Sistema AI Ibrido
 
-Sistema di ricerca intelligente prodotti usando linguaggio naturale.
+Architettura innovativa che combina:
+- **FunctionGemma (270M)** - Locale su Raspberry Pi per estrazione keywords
+- **Gemini API** - Cloud per ragionamento semantico avanzato
 
-### Setup Ollama
+### Setup
 
 ```bash
-# Installa Ollama (Linux)
+# 1. Installa Ollama (per FunctionGemma locale)
 curl -fsSL https://ollama.com/install.sh | sh
+ollama pull functiongemma:270m
 
-# Scarica modello (2GB)
-ollama pull functiongemma:2b
+# 2. Installa dipendenze Python
+pip install google-genai ollama
 
-# Verifica installazione
-ollama list
+# 3. Configura API key Gemini
+echo "GEMINI_API_KEY=your-api-key" >> .env
+# Ottieni key gratuita: https://aistudio.google.com/apikey
 ```
 
 ### Utilizzo
 
-```python
-from src.llm_interface import LLMShoppingAssistant
-
-assistant = LLMShoppingAssistant()
-
-# Ricerca singolo prodotto
-result = assistant.chat("Qual è il miglior prezzo per pasta barilla?")
-print(result)
-
-# Query complessa
-result = assistant.chat("Voglio fare una carbonara, cosa mi serve?")
+```bash
+# Test con lista della spesa
+python test_lista_spesa.py
 ```
 
-**Capacità:**
-- ✅ Ricerca multi-store automatica
-- ✅ Espansione sinonimi intelligente (es. "pasta" → "spaghetti", "penne")
-- ✅ Query multi-prodotto con conversazione
-- ✅ Output formattato markdown con prezzi e supermercati
+**Come funziona:**
+
+```
+Utente: "Pasta Barilla, latte, uova"
+    ↓
+┌─────────────────────────┐
+│ FunctionGemma (locale)  │ Estrae: ["pasta", "latte", "uova"]
+│ 270M parametri          │ Query DB per categoria "Pasta"
+└────────┬────────────────┘
+         ↓ (20 risultati)
+┌─────────────────────────┐
+│ Database SQLite         │ • Pasta sfoglia €0.95
+│ + Espansione categorie  │ • Penne rigate €0.73
+└────────┬────────────────┘ • Fusilli €0.89
+         ↓
+┌─────────────────────────┐
+│ Gemini API (cloud)      │ Ragionamento semantico:
+│ Modello: gemini-2.0     │ ✅ "Pasta Barilla" → Penne (NON sfoglia!)
+└────────┬────────────────┘ ✅ Top 3 alternative per prodotto
+         ↓
+📋 Output: Top 3 opzioni con prezzi e supermercati
+```
+
+**Vantaggi:**
+- ✅ Leggero su Raspberry Pi (solo FunctionGemma locale)
+- ✅ Ragionamento semantico accurato (Gemini cloud)
+- ✅ Espansione categorie automatica
+- ✅ Top 3 alternative con reasoning per ogni prodotto
+- ✅ Gratuito (Gemini Free Tier: 15 req/min)
 
 ---
 
@@ -467,7 +497,3 @@ Pull request benvenute! Per modifiche importanti:
    - Output `pip list`
 
 ---
-
-**Ultimo aggiornamento**: Gennaio 2026  
-**Versione**: 2.0 (Multi-Store + LLM + Paginazione)  
-**Autore**: DanyM
