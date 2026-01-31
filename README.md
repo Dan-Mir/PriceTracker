@@ -1,267 +1,473 @@
-# 🛒 Eurospin Spesa Online Scraper
+# 🛒 Supermarket Price Scraper
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
-![Selenium](https://img.shields.io/badge/Selenium-4.0%2B-green)
-![SQLite](https://img.shields.io/badge/Database-SQLite-lightgrey)
-![Status](https://img.shields.io/badge/Status-Active-brightgreen)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
+[![Selenium](https://img.shields.io/badge/Selenium-4.x-green.svg)](https://www.selenium.dev/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Un crawler avanzato basato su **Selenium** per estrarre automaticamente il catalogo prodotti, i prezzi e le offerte dal sito "La Spesa Online" di Eurospin. Progettato per essere resiliente, gestire sessioni persistenti e bypassare le complessità del frontend moderno (Shadow DOM, Salesforce, Vue.js).
-
-> **Scopo del progetto:** Creare un database storico dei prezzi per analisi dati e future integrazioni con **Home Assistant** e LLM locali (es. Gemma/Llama) per consigli sugli acquisti.
+Sistema automatico di scraping multi-supermercato per confronto prezzi e analisi. Supporta Eurospin e Castoro Shop con database centralizzato e assistente LLM integrato.
 
 ---
 
-## ✨ Funzionalità Chiave
+## 📊 Panoramica
 
-* **🕵️‍♂️ Navigazione Intelligente (BFS):** Algoritmo Breadth-First Search per scansionare categorie senza loop infiniti
-* **🔐 Session Persistence Completa:** Cookie + localStorage + sessionStorage per login automatico (~7 giorni senza OTP)
-* **⚡ Shadow DOM Bypass:** JavaScript injection per elementi Salesforce/LWC nascosti
-* **📊 Database Normalizzato:** Schema relazionale con tracking storico prezzi e offerte automatiche
-* **⏱️ Timestamp Intelligenti:** Tracciamento automatico prima registrazione e ultimo update per prodotto
-* **🤖 Automazione:** Supporto Windows Task Scheduler e Python scheduler per esecuzione periodica
-* **🧪 Test Coverage:** Suite completa di test unitari e integrazione
-* **🆕 Fuzzy Matching:** Riconoscimento intelligente prodotti simili (es. "Latte 1L" = "LATTE INTERO 1000ML")
-* **🆕 Estrazione Marca e Unità:** Parsing automatico marca e unità di misura dai prodotti
-* **🆕 Logging Strutturato:** Sistema professionale di logging con rotazione automatica file
-* **🆕 Rate Limiting:** Protezione anti-ban con delay casuali tra richieste
+| Supermercato | Prodotti | Tecnologia | Status |
+|-------------|----------|------------|--------|
+| **Eurospin** | ~350 | Shadow DOM + Session | ✅ Attivo |
+| **Castoro Shop** | 1000+ | Vue.js SPA + Paginazione (109 categorie) | ✅ Attivo |
+| **TOTALE** | **~1350+** | SQLite Database | 🟢 Online |
 
----
-
-## 🆕 Novità - Refactoring Fase 1 (Gennaio 2026)
-
-**Il progetto è stato completamente refactorizzato! Nuove funzionalità:**
-
-✅ **Sistema di Configurazione Centralizzato** (`src/config.py`)
-- Tutti i parametri in un unico file
-- Facile personalizzazione timeout, delay, soglie
-
-✅ **Logging Professionale** (`src/logger.py`)
-- Rotazione automatica file log (10MB, 5 backup)
-- Livelli configurabili (DEBUG, INFO, WARNING, ERROR)
-- Output su file e console
-
-✅ **Normalizzazione Prodotti** (`src/normalizer.py`)
-- Fuzzy matching con soglia configurabile
-- Estrazione intelligente marca e unità misura
-- Gestione sinonimi e varianti
-
-✅ **Gestione Errori Robusta** (`src/utils.py`)
-- Retry automatico con exponential backoff
-- Rate limiting anti-ban
-- Decorator per operazioni sicure
-
-**📖 Documentazione completa:** [REFACTORING_FASE1.md](REFACTORING_FASE1.md) | [SUMMARY_FASE1.md](SUMMARY_FASE1.md)
+**Funzionalità Principali:**
+- 🔄 Scraping automatico con paginazione intelligente
+- 🤖 Assistente LLM (Ollama/Gemma) per ricerca prodotti
+- 📈 Database storico prezzi con tracking temporale
+- 🎯 Confronto prezzi multi-store
+- ⏰ Automazione completa via cron job
 
 ---
 
-## 📂 Struttura del Progetto
+## 🚀 Quick Start
 
-```text
-supermarket_parser/
-├── src/
-│   ├── main.py           # Entry point dello script
-│   ├── parser.py         # Web scraper con Selenium + BFS crawler
-│   ├── db.py             # Database layer con schema normalizzato
-│   ├── config.py         # 🆕 Configurazione centralizzata
-│   ├── logger.py         # 🆕 Sistema logging strutturato
-│   ├── normalizer.py     # 🆕 Normalizzazione e fuzzy matching prodotti
-│   ├── utils.py          # 🆕 Utilities (retry, rate limiting)
-│   ├── scheduler.py      # Automazione Python (cron-like)
-│   ├── show_db.py        # Visualizza contenuto database
-│   ├── show_offers.py    # Mostra prodotti in offerta
-│   └── clean_db.py       # Pulizia database
-├── tests/
-│   ├── test_db.py        # Test database operations
-│   ├── test_parser_utils.py  # Test parsing utilities
-│   ├── test_integration.py   # Test integrazione
-│   └── run_tests.py      # Test runner
-├── logs/                 # 🆕 Directory log (auto-creata)
-│   └── scraper.log       # File di log con rotazione
-├── README.md             # Documentazione principale
-├── REFACTORING_FASE1.md  # 🆕 Dettagli refactoring Fase 1
-├── SUMMARY_FASE1.md      # 🆕 Riepilogo refactoring
-├── AUTOMAZIONE.md        # Guida setup automazione
-├── SUPERMERCATI.md       # Roadmap multi-supermercato
-├── requirements.txt      # Dipendenze Python (aggiornato)
-├── test_refactoring.py   # 🆕 Test suite refactoring
-├── run_scraping.bat      # Script Windows per Task Scheduler
-└── .gitignore            # File esclusi da git
-```
-
----
-
-## 🚀 Installazione
-
-### Prerequisiti
-
-- Python 3.8 o superiore
-- Google Chrome installato
-- ChromeDriver compatibile con la tua versione di Chrome
-
-### 1. Clona la repository
+### Installazione
 
 ```bash
-git clone https://github.com/TUO_USERNAME/supermarket_parser.git
+# Clone repository
+git clone <repo-url>
 cd supermarket_parser
-```
 
-### 2. Crea virtual environment
-
-```bash
-python -m venv .venv
-
-# Linux/Mac/Raspberry Pi
+# Setup ambiente virtuale
+python3 -m venv .venv
 source .venv/bin/activate
 
-# Windows
-.venv\Scripts\activate
+# Installa dipendenze
+pip install -r requirements.txt
+
+# Configura email Eurospin
+echo "EUROSPIN_EMAIL=tua.email@esempio.com" > .env
 ```
 
-### 3. Installa dipendenze
+### Primo Utilizzo
 
 ```bash
-pip install -r requirements.txt
+# 1. Esegui scraping
+./run_scraping.sh
+
+# 2. Visualizza database
+python src/show_db.py
+
+# 3. Cerca offerte
+python src/show_offers.py "pasta"
+
+# 4. Assistente LLM (richiede Ollama)
+python demo_llm.py
 ```
 
 ---
 
-## 💻 Utilizzo
+## ⚙️ Automazione
 
-### Primo Avvio (Login OTP)
+### Setup Cron Job
 
-```bash
-cd src
-python main.py
-```
-
-1. Inserisci email quando richiesto
-2. Ricevi OTP via email
-3. Inserisci codice OTP nel terminale
-4. **Sessione salvata** (cookie + localStorage + sessionStorage) → valida ~7 giorni
-
-### Esecuzioni Successive (SENZA OTP)
+Configurazione per esecuzione settimanale automatica:
 
 ```bash
-python main.py  # Login automatico, nessun OTP richiesto
-```
-
-### Automazione
-
-**Windows (Task Scheduler):**
-```powershell
-# Test manuale
-.\run_scraping.bat
-
-# Setup automatico (vedi AUTOMAZIONE.md)
-```
-
-**Linux/Raspberry Pi (cron):**
-```bash
-# Esecuzione giornaliera ore 3:00
+# Modifica crontab
 crontab -e
-# Aggiungi: 0 3 * * * /path/to/.venv/bin/python /path/to/src/main.py >> /path/to/scraping.log 2>&1
+
+# Aggiungi (esecuzione domenica ore 2:00)
+0 2 * * 0 /home/danym/Desktop/supermarket_parser/run_scraping.sh
 ```
 
-**Python Scheduler:**
-```bash
-cd src
-python scheduler.py  # Loop continuo con scheduling configurabile
-```
-
-### Visualizza Dati
+### Monitoring Logs
 
 ```bash
+# Visualizza log in tempo reale
+tail -f logs/scraping_$(date +%Y%m%d)_*.log
+
 # Statistiche database
 python src/show_db.py
 
-# Prodotti in offerta
-python src/show_offers.py
+# Verifica errori
+grep -i error logs/*.log | tail -20
+```
 
-# Pulizia database
+---
+
+## 📁 Struttura Progetto
+
+```
+supermarket_parser/
+├── run_scraping.sh              # ⭐ Script automazione principale
+├── src/
+│   ├── scrape_all.py            # Orchestrator scraping multi-store
+│   ├── parser.py                # Parser Eurospin (Shadow DOM)
+│   ├── castoro_parser.py        # Parser Castoro (109 categorie + paginazione)
+│   ├── castoro_all_urls.py      # Lista URL categorie Castoro
+│   ├── db.py                    # Database SQLite manager
+│   ├── llm_interface.py         # Interfaccia LLM per ricerca intelligente
+│   ├── config.py                # Configurazione centralizzata
+│   ├── normalizer.py            # Normalizzazione prodotti/fuzzy matching
+│   ├── utils.py                 # Utilities (retry, rate limiting)
+│   ├── show_db.py               # Visualizza contenuto database
+│   └── show_offers.py           # Cerca migliori offerte
+├── tests/                       # Test e script di debug
+│   ├── debug_scripts/           # Script esplorazione/debug
+│   └── run_tests.py             # Esecuzione test suite
+├── logs/                        # Log di scraping
+└── README.md                    # Questa documentazione
+```
+
+---
+
+## 🔧 Configurazione
+
+### Variabili Ambiente (.env)
+
+```env
+# Email per login Eurospin (obbligatorio)
+EUROSPIN_EMAIL=tua.email@esempio.com
+
+# LLM (opzionale - richiede Ollama installato)
+OLLAMA_API_URL=http://localhost:11434
+OLLAMA_MODEL=functiongemma:2b
+```
+
+### Parametri Scraping (src/config.py)
+
+```python
+# Timing
+CATEGORY_DELAY = 5              # Delay tra categorie (secondi)
+PAGE_LOAD_DELAY = 8             # Attesa caricamento pagina
+RETRY_DELAY = 3                 # Delay tra retry
+
+# Browser
+HEADLESS = True                 # Browser senza interfaccia grafica
+WINDOW_SIZE = (1920, 1080)      # Risoluzione finestra
+
+# Paginazione
+MAX_PAGINATION_PAGES = 20       # Massimo pagine per categoria
+```
+
+---
+
+## 🤖 Assistente LLM
+
+Sistema di ricerca intelligente prodotti usando linguaggio naturale.
+
+### Setup Ollama
+
+```bash
+# Installa Ollama (Linux)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Scarica modello (2GB)
+ollama pull functiongemma:2b
+
+# Verifica installazione
+ollama list
+```
+
+### Utilizzo
+
+```python
+from src.llm_interface import LLMShoppingAssistant
+
+assistant = LLMShoppingAssistant()
+
+# Ricerca singolo prodotto
+result = assistant.chat("Qual è il miglior prezzo per pasta barilla?")
+print(result)
+
+# Query complessa
+result = assistant.chat("Voglio fare una carbonara, cosa mi serve?")
+```
+
+**Capacità:**
+- ✅ Ricerca multi-store automatica
+- ✅ Espansione sinonimi intelligente (es. "pasta" → "spaghetti", "penne")
+- ✅ Query multi-prodotto con conversazione
+- ✅ Output formattato markdown con prezzi e supermercati
+
+---
+
+## 📊 Database
+
+### Schema Tabelle
+
+**supermercati**
+- `id`, `nome`, `url`, `ultimo_scraping`
+
+**prodotti**
+- `id`, `nome`, `nome_normalizzato`, `categoria`, `marca`, `unita_misura`
+- `primo_inserimento`, `ultimo_aggiornamento`
+
+**prezzi**
+- `id`, `prodotto_id`, `supermercato_id`, `prezzo`, `in_offerta`
+- `prezzo_originale`, `url_prodotto`, `timestamp`
+
+### Query Utili
+
+```python
+from src.db import PriceDatabase
+
+db = PriceDatabase()
+
+# Statistiche generali
+stats = db.get_stats()
+print(f"Prodotti totali: {stats['totale_prodotti']}")
+print(f"Prezzi registrati: {stats['totale_prezzi']}")
+
+# Cerca prodotto
+prodotti = db.search_product("barilla")
+for p in prodotti:
+    print(f"{p['nome']} - {p['supermercato']}: €{p['prezzo']}")
+
+# Storico prezzi
+history = db.get_price_history(product_id=123)
+```
+
+---
+
+## 🧪 Testing
+
+```bash
+# Esegui tutti i test
+python tests/run_tests.py
+
+# Test specifici
+python tests/test_db.py
+python tests/test_parser_utils.py
+python tests/test_integration.py
+
+# Debug Castoro
+python tests/debug_scripts/explore_castoro.py
+python tests/debug_scripts/test_pagination.py
+```
+
+---
+
+## 🔍 Troubleshooting
+
+### Errore: "selenium not found"
+
+```bash
+# Attiva ambiente virtuale
+source .venv/bin/activate
+
+# Reinstalla dipendenze
+pip install -r requirements.txt
+```
+
+### Errore: "chromedriver not found"
+
+```bash
+# Raspberry Pi / ARM
+sudo apt install chromium-chromedriver
+
+# x86/x64
+# Selenium 4.x installa automaticamente chromedriver
+# Se necessario: pip install --upgrade selenium
+```
+
+### Database non si aggiorna
+
+```bash
+# Verifica permessi
+ls -la src/prezzi.db
+
+# Assegna permessi
+chmod 664 src/prezzi.db
+
+# Reset database (ATTENZIONE: cancella tutto)
 python src/clean_db.py
 ```
 
-### Test Suite
+### Cron job non funziona
 
 ```bash
-cd tests
-python run_tests.py  # Esegue 25 test (database, parser, integrazione)
+# Verifica log di sistema
+grep CRON /var/log/syslog | tail -20
+
+# Test manuale script
+./run_scraping.sh
+
+# Verifica permessi esecuzione
+chmod +x run_scraping.sh
+
+# Controlla path assoluti in crontab
+# ❌ SBAGLIATO: ./run_scraping.sh
+# ✅ CORRETTO: /home/user/supermarket_parser/run_scraping.sh
+```
+
+### Scraping Castoro lento
+
+```bash
+# Riduci numero categorie (modifica castoro_all_urls.py)
+# O aumenta timeout in config.py:
+PAGE_LOAD_DELAY = 10  # Da 8 a 10 secondi
 ```
 
 ---
 
-## 🗄️ Schema Database
+## 📈 Performance
 
-Database SQLite normalizzato con 3 tabelle:
+### Tempi di Scraping
 
-### Tabella `prodotti`
-| Colonna | Tipo | Descrizione |
-|---------|------|-------------|
-| `id` | INTEGER | Primary key |
-| `nome` | TEXT | Nome prodotto |
-| `marca` | TEXT | Marca (nullable) |
-| `categoria` | TEXT | Categoria/sottocategoria |
-| `unita_misura` | TEXT | Peso/unità (es. "500g", "1L") |
-| `codice_prodotto` | TEXT | Hash MD5 univoco (nome+marca+unità) |
-| `data_creazione` | DATETIME | **Timestamp prima registrazione** |
-| `data_ultimo_update` | DATETIME | **Timestamp ultimo scraping** |
+| Supermercato | Categorie | Prodotti | Tempo Stimato |
+|-------------|-----------|----------|---------------|
+| Eurospin | ~20 | ~350 | 15-20 min |
+| Castoro Shop | 109 | 1000+ | 60-90 min |
+| **TOTALE** | **129** | **~1350+** | **90-120 min** |
 
-### Tabella `prezzi`
-| Colonna | Tipo | Descrizione |
-|---------|------|-------------|
-| `id` | INTEGER | Primary key |
-| `prodotto_id` | INTEGER | FK → prodotti |
-| `supermercato_id` | INTEGER | FK → supermercati |
-| `prezzo_listino` | REAL | Prezzo pieno |
-| `prezzo_attuale` | REAL | Prezzo di vendita |
-| `in_offerta` | BOOLEAN | True se scontato |
-| `sconto_percentuale` | REAL | % sconto calcolato |
-| `data_rilevazione` | DATETIME | Timestamp rilevazione |
+### Ottimizzazioni Implementate
 
-### Tabella `supermercati`
-| Colonna | Tipo | Descrizione |
-|---------|------|-------------|
-| `id` | INTEGER | Primary key |
-| `nome` | TEXT | Nome supermercato (UNIQUE) |
-| `citta` | TEXT | Località (nullable) |
-| `ultimo_scraping` | DATETIME | Timestamp ultimo scraping |
-
-### Logica Upsert Intelligente
-- **Nuovo prodotto**: Inserimento con `data_creazione = NOW()`
-- **Prodotto esistente**: Update solo `data_ultimo_update = NOW()`
-- **Nuovo record prezzo**: Solo se prezzo cambiato O passate >24h
-- **Rilevamento offerte**: Automatico se `prezzo_attuale < prezzo_listino`
+- ✅ **Paginazione automatica**: Tutte le pagine per ogni categoria
+- ✅ **Lazy loading detection**: Scroll + wait per contenuti dinamici
+- ✅ **Session persistence**: Cookie salvati per 7 giorni (no login ripetuti)
+- ✅ **Rate limiting**: Delay randomizzati anti-ban
+- ✅ **Fuzzy matching**: Evita duplicati prodotti simili
+- ✅ **Headless mode**: Nessuna interfaccia grafica (più veloce)
 
 ---
 
-## 🗺️ Roadmap
+## 🛠️ Sviluppo
 
-- [x] Crawler BFS con paginazione automatica
-- [x] Login persistente (cookie + localStorage + sessionStorage)
-- [x] Database normalizzato con storico prezzi
-- [x] Timestamp tracking (creazione + ultimo update)
-- [x] Rilevamento offerte automatico
-- [x] Suite completa di test (25 test)
-- [x] Automazione Windows/Linux
-- [ ] **Deploy su Raspberry Pi** ← Prossimo step
-- [ ] API REST (Flask/FastAPI) per esposizione dati
-- [ ] Dashboard web per visualizzazione offerte
-- [ ] Multi-supermercato (Lidl, Conad, Esselunga - vedi SUPERMERCATI.md)
-- [ ] Integrazione Home Assistant
-- [ ] Query LLM (Gemma/Llama) per consigli spesa
+### Aggiungere Nuovo Supermercato
 
-Vedi [SUPERMERCATI.md](SUPERMERCATI.md) per roadmap dettagliata multi-store.
+1. **Crea nuovo parser** in `src/nuovo_parser.py`:
+
+```python
+from selenium import webdriver
+from src.db import PriceDatabase
+from src.config import *
+
+class NuovoParser:
+    def __init__(self):
+        self.db = PriceDatabase()
+        self.driver = webdriver.Chrome(...)
+    
+    def scrape_all(self):
+        # Logica scraping
+        pass
+    
+    def _extract_product(self, element):
+        # Parsing singolo prodotto
+        return {
+            'nome': ...,
+            'prezzo': ...,
+            'categoria': ...
+        }
+```
+
+2. **Aggiungi a `src/scrape_all.py`**:
+
+```python
+from src.nuovo_parser import NuovoParser
+
+def main():
+    # ... parser esistenti ...
+    
+    print("\n=== NUOVO SUPERMERCATO ===")
+    nuovo = NuovoParser()
+    nuovo.scrape_all()
+```
+
+3. **Testa**:
+
+```bash
+python src/scrape_all.py
+```
+
+### Script Debug Disponibili
+
+In `tests/debug_scripts/`:
+
+- `explore_castoro.py` - Esplora struttura HTML sito Castoro
+- `debug_castoro.py` - Debug generale parser Castoro
+- `test_pagination.py` - Testa paginazione specifica categoria
+- `generate_castoro_urls.py` - Genera lista URL da file categorie
 
 ---
 
-## ⚠️ Disclaimer
+## 📝 Log Files
 
-Questo progetto è stato creato **a scopo educativo e di studio** per analizzare le tecniche di web scraping su siti moderni (SPA, Shadow DOM).
+I log vengono salvati in `logs/scraping_YYYYMMDD_HHMM.log`
 
-**L'autore non è affiliato con Eurospin.** L'uso automatizzato di bot sui siti web potrebbe violare i Termini di Servizio. Utilizza questo script **responsabilmente**, limitando la frequenza delle richieste per non sovraccaricare i server.
+**Contenuto:**
+- Timestamp dettagliato operazioni
+- Progressi per categoria
+- Numero prodotti scrapati
+- Errori con traceback
+- Statistiche finali (totale prodotti, tempo esecuzione)
+
+**Gestione log:**
+
+```bash
+# Visualizza ultimi 100 log
+tail -100 logs/scraping_*.log
+
+# Cerca errori specifici
+grep -i "error\|exception" logs/*.log
+
+# Pulizia vecchi log (>30 giorni)
+find logs/ -name "*.log" -mtime +30 -delete
+
+# Dimensione totale log
+du -sh logs/
+```
 
 ---
 
-## 📝 Licenza
+## 🎯 Roadmap
 
-Questo progetto è distribuito sotto licenza MIT. Vedi il file `LICENSE` per maggiori dettagli.
+**Supermercati Pianificati:**
+- [ ] Parser Lidl
+- [ ] Parser Conad
+- [ ] Parser Carrefour
+
+**Features Future:**
+- [ ] API REST per accesso esterno database
+- [ ] Dashboard web interattiva (Vue.js/React)
+- [ ] Notifiche Telegram per offerte
+- [ ] Integrazione Home Assistant avanzata
+- [ ] Machine learning previsione prezzi
+- [ ] Comparazione prezzi con analisi storica
+- [ ] Export CSV/Excel report
+
+---
+
+## 📄 Licenza
+
+MIT License - Vedi file LICENSE
+
+---
+
+## 🤝 Contributi
+
+Pull request benvenute! Per modifiche importanti:
+
+1. Apri issue per discussione
+2. Fork repository
+3. Crea branch feature (`git checkout -b feature/AmazingFeature`)
+4. Commit modifiche (`git commit -m 'Add AmazingFeature'`)
+5. Push a branch (`git push origin feature/AmazingFeature`)
+6. Apri Pull Request
+
+---
+
+## 📞 Supporto
+
+**Hai problemi?**
+
+1. Consulta sezione [Troubleshooting](#-troubleshooting)
+2. Verifica [Issues GitHub](https://github.com/user/repo/issues) esistenti
+3. Apri nuovo issue con:
+   - Descrizione problema
+   - Log errore completo
+   - Sistema operativo e versione Python
+   - Output `pip list`
+
+---
+
+**Ultimo aggiornamento**: Gennaio 2026  
+**Versione**: 2.0 (Multi-Store + LLM + Paginazione)  
+**Autore**: DanyM

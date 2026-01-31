@@ -2,6 +2,7 @@ import sqlite3
 from datetime import datetime
 import os
 import hashlib
+from typing import List
 
 try:
     from logger import get_logger
@@ -303,6 +304,91 @@ class PriceDatabase:
             })
         
         return results
+    
+    def search_products_by_category(self, categories: List[str], limit: int = 20):
+        """
+        Cerca prodotti per categoria
+        
+        Args:
+            categories: Lista di categorie da cercare
+            limit: Numero massimo risultati
+        
+        Returns:
+            Lista di dict con prodotti trovati
+        """
+        if not categories:
+            return []
+        
+        # Costruisci query con OR per ogni categoria
+        category_conditions = ' OR '.join(['p.categoria LIKE ?' for _ in categories])
+        
+        sql = f'''
+            SELECT p.nome, p.marca, p.categoria, p.unita_misura, pr.prezzo_attuale, s.nome as supermercato
+            FROM prodotti p
+            JOIN prezzi pr ON p.id = pr.prodotto_id
+            JOIN supermercati s ON pr.supermercato_id = s.id
+            WHERE ({category_conditions})
+              AND pr.id IN (
+                  SELECT MAX(id) FROM prezzi GROUP BY prodotto_id, supermercato_id
+              )
+            ORDER BY pr.prezzo_attuale ASC
+            LIMIT ?
+        '''
+        
+        params = [f'%{cat}%' for cat in categories]
+        params.append(limit)
+        
+        cursor = self.conn.execute(sql, params)
+        
+        results = []
+        for row in cursor.fetchall():
+            results.append({
+                'nome': row[0],
+                'marca': row[1],
+                'categoria': row[2],
+                'unita_misura': row[3],
+                'prezzo': row[4],
+                'supermercato': row[5]
+            })
+        
+        return results
+    
+    def search_products_enhanced(self, query: str, categories: List[str] = None, limit: int = 20):
+        """
+        Ricerca avanzata: cerca per nome E per categoria
+        
+        Args:
+            query: Testo da cercare nel nome
+            categories: Categorie da includere (opzionale)
+            limit: Numero massimo risultati
+        
+        Returns:
+            Lista di dict con prodotti trovati (senza duplicati)
+        """
+        results = []
+        seen = set()  # Per evitare duplicati
+        
+        # 1. Cerca per nome
+        name_results = self.search_products(query, limit=limit)
+        for r in name_results:
+            key = (r['nome'], r['supermercato'])
+            if key not in seen:
+                results.append(r)
+                seen.add(key)
+        
+        # 2. Se specificati, cerca anche per categoria
+        if categories:
+            cat_results = self.search_products_by_category(categories, limit=limit)
+            for r in cat_results:
+                key = (r['nome'], r['supermercato'])
+                if key not in seen and len(results) < limit:
+                    results.append(r)
+                    seen.add(key)
+        
+        # Ordina per prezzo
+        results.sort(key=lambda x: x['prezzo'])
+        
+        return results[:limit]
     
     def get_all_supermarkets(self):
         """Ottiene lista di tutti i supermercati nel database"""

@@ -1,8 +1,8 @@
 """
 Script per visualizzare i prodotti in offerta dal database
 """
-from db import PriceDatabase
-from logger import get_logger
+from src.db import PriceDatabase
+from src.logger import get_logger
 
 logger = get_logger(__name__)
 

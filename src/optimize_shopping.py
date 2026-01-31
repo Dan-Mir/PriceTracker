@@ -2,8 +2,8 @@
 Script per ottimizzare la spesa da lista in file di testo
 """
 import sys
-from shopping_optimizer import ShoppingOptimizer
-from logger import get_logger
+from src.shopping_optimizer import ShoppingOptimizer
+from src.logger import get_logger
 
 logger = get_logger(__name__)
 

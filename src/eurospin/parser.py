@@ -10,11 +10,11 @@ import pickle
 import os
 import platform
 from collections import deque
-from db import PriceDatabase
-from logger import get_logger
-from normalizer import ProductNormalizer
-from utils import retry_on_exception, RateLimiter
-import config
+from ..db import PriceDatabase
+from ..logger import get_logger
+from ..normalizer import ProductNormalizer
+from ..utils import retry_on_exception, RateLimiter
+from .. import config
 
 logger = get_logger(__name__)
 

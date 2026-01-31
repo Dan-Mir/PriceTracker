@@ -1,12 +1,12 @@
-from parser import EurospinParser
+from eurospin.parser import EurospinParser
 import time
 import threading
 import os
 import shutil
 import argparse
 from dotenv import load_dotenv
-from logger import get_logger
-import config
+from src.logger import get_logger
+from src import config
 
 load_dotenv("../.env")
 logger = get_logger(__name__)

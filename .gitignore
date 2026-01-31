@@ -1,6 +1,8 @@
 # Python cache
 __pycache__/
 *.py[cod]
+.venv/
+*.pyc
 
 # Database
 *.db
@@ -14,6 +16,14 @@ screenshots/
 logs/
 *.log
 debug_video.zip
+supermarkets_html/
+
+# File temporanei Castoro
+castoro_*.html
+castoro_*.png
+castoro_*.txt
+menu_*.png
+archive/
 
 # Cartelle IDE
 .vscode/
@@ -24,3 +34,7 @@ src/*.pkl
 
 # Configurations
 *.deb*
+
+# Script temporanei
+cleanup_and_organize.sh
+nohup.out

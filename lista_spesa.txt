@@ -1,14 +1,10 @@
-# Lista della spesa - esempio
-# Una riga = un prodotto
-# Righe che iniziano con # sono commenti (ignorate)
-
-latte
-pane
-pasta
-olio
-pomodoro
-mozzarella
-prosciutto
-yogurt
-biscotti
-acqua
+Pasta Barilla
+Latte fresco
+Olio extravergine d'oliva
+Pomodori pelati
+Pane
+Mozzarella
+Uova di gallina
+Caffè
+Zucchero di canna
+Biscotti per colazione
