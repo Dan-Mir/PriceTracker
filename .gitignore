@@ -25,6 +25,7 @@ castoro_*.txt
 menu_*.png
 archive/
 
+
 # Cartelle IDE
 .vscode/
 .idea/
@@ -38,3 +39,5 @@ src/*.pkl
 # Script temporanei
 cleanup_and_organize.sh
 nohup.out
+
+lista_spesa.txt

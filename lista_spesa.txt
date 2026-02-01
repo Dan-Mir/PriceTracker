@@ -1,10 +1,11 @@
-Pasta Barilla
-Latte fresco
-Olio extravergine d'oliva
-Pomodori pelati
+Pasta
+Latte
+Olio d'oliva
+Pomodori
+Funghi
 Pane
-Mozzarella
-Uova di gallina
+Uova
+Verdure
 Caffè
 Zucchero di canna
 Biscotti per colazione

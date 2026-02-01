@@ -19,10 +19,12 @@ Sistema automatico di scraping multi-supermercato per confronto prezzi e analisi
 **Funzionalità Principali:**
 - 🔄 Scraping automatico con paginazione intelligente
 - 🤖 **Sistema ibrido AI**: FunctionGemma (locale) + Gemini API (cloud)
+- 🌐 **Frontend Web**: Interfaccia moderna per ottimizzare lista spesa
 - 🧠 Espansione keyword intelligente con categorie database
 - 📈 Database storico prezzi con tracking temporale
 - 🎯 Top 3 alternative per ogni prodotto con reasoning
 - ⏰ Automazione completa via cron job
+- 📡 **API REST**: Backend Flask con endpoint per integrazione esterna
 
 ---
 
@@ -56,10 +58,14 @@ echo "GEMINI_API_KEY=tua-api-key-gemini" >> .env
 # 2. Visualizza database
 python src/show_db.py
 
-# 3. Test sistema AI ibrido con lista spesa
+# 3. Avvia frontend web
+./run_server.sh
+# Poi apri frontend/index.html nel browser
+
+# 4. Oppure testa via CLI
 python test_lista_spesa.py
 
-# 4. Cerca offerte specifiche
+# 5. Cerca offerte specifiche
 python src/show_offers.py "pasta"
 ```
 
@@ -98,9 +104,16 @@ grep -i error logs/*.log | tail -20
 
 ```
 supermarket_parser/
-├── run_scraping.sh              # ⭐ Script automazione principale
-├── test_lista_spesa.py          # ⭐ Test sistema AI ibrido
+├── run_scraping.sh              # ⭐ Script automazione scraping
+├── run_server.sh                # ⭐ Script avvio backend API
+├── test_lista_spesa.py          # Test sistema AI ibrido (CLI)
 ├── lista_spesa.txt              # Esempio lista della spesa
+├── backend/
+│   └── api.py                   # 🆕 Flask API REST
+├── frontend/
+│   ├── index.html               # 🆕 Interfaccia web
+│   ├── style.css                # 🆕 Styling responsive
+│   └── app.js                   # 🆕 JavaScript frontend
 ├── src/
 │   ├── eurospin/
 │   │   └── parser.py            # Parser Eurospin (Shadow DOM)
@@ -109,8 +122,8 @@ supermarket_parser/
 │   │   ├── castoro_all_urls.py  # URL categorie
 │   │   └── castoro_categories.txt
 │   ├── scrape_all.py            # Orchestrator multi-store
-│   ├── gemini_optimizer.py      # 🆕 Ottimizzatore ibrido AI
-│   ├── keyword_expander.py      # 🆕 Espansione categorie
+│   ├── gemini_optimizer.py      # Ottimizzatore ibrido AI
+│   ├── keyword_expander.py      # Espansione categorie
 │   ├── db.py                    # Database SQLite + ricerca avanzata
 │   ├── llm_interface.py         # Interfaccia FunctionGemma
 │   ├── config.py                # Configurazione centralizzata
@@ -216,6 +229,81 @@ Utente: "Pasta Barilla, latte, uova"
 - ✅ Espansione categorie automatica
 - ✅ Top 3 alternative con reasoning per ogni prodotto
 - ✅ Gratuito (Gemini Free Tier: 15 req/min)
+
+---
+
+## 🌐 Frontend Web
+
+### Setup
+
+```bash
+# 1. Installa dipendenze backend
+pip install flask flask-cors
+
+# 2. Avvia backend API
+./run_server.sh
+
+# 3. Apri frontend nel browser
+# Vai su: frontend/index.html
+# Oppure con server locale:
+cd frontend
+python -m http.server 8080
+# Apri http://localhost:8080
+```
+
+### Utilizzo
+
+1. **Inserisci lista della spesa** (uno per riga):
+   ```
+   Pasta Barilla
+   Latte intero
+   Uova fresche
+   Pomodori pelati
+   ```
+
+2. **Clicca "Ottimizza Lista"**
+   - FunctionGemma estrae keywords
+   - Database ricerca con categorie espanse
+   - Gemini seleziona top 3 alternative
+
+3. **Risultati visualizzati**:
+   - Top 3 prodotti per ogni query
+   - Prezzo, supermercato, categoria
+   - Ragionamento AI per ogni scelta
+   - Esporta risultati in TXT
+
+### API Endpoints
+
+**Backend Flask** (porta 5000):
+
+| Endpoint | Method | Descrizione |
+|----------|--------|-------------|
+| `/api/health` | GET | Health check API |
+| `/api/stats` | GET | Statistiche database |
+| `/api/optimize` | POST | Ottimizza lista spesa |
+| `/api/search` | POST | Cerca prodotti |
+
+**Esempio richiesta**:
+```bash
+curl -X POST http://localhost:5000/api/optimize \
+  -H "Content-Type: application/json" \
+  -d '{"items": ["pasta", "latte", "uova"]}'
+```
+
+**Risposta**:
+```json
+{
+  "success": true,
+  "data": {
+    "results": [...],
+    "summary": {
+      "total_products": 3,
+      "total_matches": 42,
+      "avg_matches_per_product": 14.0
+    }
+  }
+}
+```
 
 ---
 

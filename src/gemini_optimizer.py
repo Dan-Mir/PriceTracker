@@ -11,10 +11,18 @@ from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from src.logger import get_logger
-from src.db import PriceDatabase
-from src.llm_interface import GemmaShoppingAssistant
-from src.keyword_expander import KeywordExpander
+
+# Import con gestione path relativo e assoluto
+try:
+    from logger import get_logger
+    from db import PriceDatabase
+    from llm_interface import GemmaShoppingAssistant
+    from keyword_expander import KeywordExpander
+except ImportError:
+    from src.logger import get_logger
+    from src.db import PriceDatabase
+    from src.llm_interface import GemmaShoppingAssistant
+    from src.keyword_expander import KeywordExpander
 
 load_dotenv()
 logger = get_logger(__name__)

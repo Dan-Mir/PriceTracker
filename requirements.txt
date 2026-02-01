@@ -5,3 +5,6 @@ python-dotenv
 fuzzywuzzy[speedup]
 python-Levenshtein
 ollama
+flask
+flask-cors
+google-genai

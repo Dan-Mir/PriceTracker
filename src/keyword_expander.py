@@ -2,7 +2,11 @@
 Sistema di espansione keyword usando le categorie del database
 """
 from typing import List, Dict, Set
-from src.logger import get_logger
+
+try:
+    from logger import get_logger
+except ImportError:
+    from src.logger import get_logger
 
 logger = get_logger(__name__)
 

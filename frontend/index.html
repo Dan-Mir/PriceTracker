@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛒 Supermarket Price Optimizer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🛒 Supermarket Price Optimizer</h1>
+                <p class="subtitle">Sistema AI Ibrido per ottimizzare la tua spesa</p>
+            </div>
+            <div class="stats-bar" id="statsBar">
+                <div class="stat-item">
+                    <span class="stat-label">Prodotti DB</span>
+                    <span class="stat-value" id="totalProducts">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Supermercati</span>
+                    <span class="stat-value" id="totalStores">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Status API</span>
+                    <span class="stat-value status-indicator" id="apiStatus">
+                        <span class="status-dot"></span>
+                        Checking...
+                    </span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Input Section -->
+            <section class="input-section">
+                <h2>📝 Lista della Spesa</h2>
+                <p class="helper-text">Inserisci un prodotto per riga (es: pasta, latte, uova)</p>
+                
+                <textarea 
+                    id="shoppingListInput" 
+                    class="shopping-input"
+                    placeholder="Pasta Barilla&#10;Latte intero&#10;Uova fresche&#10;Pomodori pelati&#10;Mozzarella&#10;Prosciutto cotto&#10;Pane&#10;Caffè&#10;Zucchero&#10;Olio extravergine"
+                    rows="12"
+                ></textarea>
+                
+                <div class="button-group">
+                    <button id="optimizeBtn" class="btn btn-primary">
+                        <span class="btn-icon">🚀</span>
+                        <span class="btn-text">Ottimizza Lista</span>
+                    </button>
+                    <button id="clearBtn" class="btn btn-secondary">
+                        <span class="btn-icon">🗑️</span>
+                        <span class="btn-text">Pulisci</span>
+                    </button>
+                </div>
+
+                <!-- Loading Spinner -->
+                <div id="loadingIndicator" class="loading-container" style="display: none;">
+                    <div class="spinner"></div>
+                    <p class="loading-text">
+                        <strong>Ottimizzazione in corso...</strong><br>
+                        <span id="loadingStatus">Analisi prodotti con AI ibrido</span>
+                    </p>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <div class="results-header">
+                    <h2>✅ Risultati Ottimizzazione</h2>
+                    <div class="summary-pills" id="summaryPills"></div>
+                </div>
+
+                <div id="resultsContainer" class="results-container">
+                    <!-- Results will be dynamically inserted here -->
+                </div>
+
+                <div class="results-footer">
+                    <button id="exportBtn" class="btn btn-outline">
+                        <span class="btn-icon">💾</span>
+                        <span class="btn-text">Esporta Risultati</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Error Section -->
+            <section class="error-section" id="errorSection" style="display: none;">
+                <div class="error-box">
+                    <span class="error-icon">⚠️</span>
+                    <div class="error-content">
+                        <h3>Errore</h3>
+                        <p id="errorMessage"></p>
+                    </div>
+                    <button id="closeErrorBtn" class="btn-close">✕</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>
+                Powered by <strong>FunctionGemma</strong> (locale) + <strong>Gemini API</strong> (cloud) • 
+                <a href="https://github.com" target="_blank">GitHub</a> • 
+                Made with ❤️ by DanyM
+            </p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
