@@ -1,0 +1,47 @@
+
+<!DOCTYPE html>
+<html>
+<body>
+    <h1>Eurospin Mock</h1>
+    
+    <!-- Product in Light DOM -->
+    <div class="product">
+        <div class="name">Light DOM Product</div>
+        <div class="price">1.50 €</div>
+    </div>
+
+    <!-- Product in Shadow DOM -->
+    <div id="host1"></div>
+    <script>
+        const host1 = document.querySelector('#host1');
+        const shadow1 = host1.attachShadow({mode: 'open'});
+        shadow1.innerHTML = `
+            <div class="card">
+                <div class="title">Shadow Product 1</div>
+                <div class="prezzo">2,99 €</div>
+            </div>
+        `;
+    </script>
+
+    <!-- Product in Nested Shadow DOM -->
+    <div id="host2"></div>
+    <script>
+        const host2 = document.querySelector('#host2');
+        const shadow2 = host2.attachShadow({mode: 'open'});
+        shadow2.innerHTML = `
+            <div class="container">
+                <div id="nested-host"></div>
+            </div>
+        `;
+        
+        const nestedHost = shadow2.querySelector('#nested-host');
+        const nestedShadow = nestedHost.attachShadow({mode: 'open'});
+        nestedShadow.innerHTML = `
+            <div class="item">
+                <span class="p-name">Nested Shadow Product</span>
+                <span class="p-price">10.00 €</span>
+            </div>
+        `;
+    </script>
+</body>
+</html>

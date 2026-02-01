@@ -8,6 +8,25 @@ Sistema automatico di scraping multi-supermercato per confronto prezzi e analisi
 
 ---
 
+## Descrizione
+Questo progetto fornisce un sistema completo per eseguire lo scraping automatico dei prezzi da diversi supermercati italiani, tramite i loro shop online.
+Utilizzando tecniche avanzate di scraping (incluso Shadow DOM e paginazione intelligente), raccoglie dati sui prodotti e li memorizza in un database SQLite. Un sistema ibrido basato su modelli LLM (FunctionGemma locale e Gemini API cloud) consente di ottimizzare le liste della spesa, offrendo alternative intelligenti basate
+su ragionamento semantico. Un'interfaccia web moderna permette agli utenti di interagire facilmente con il sistema, visualizzare i dati e ottenere raccomandazioni.
+L'aggiornamento dei dati è automatizzato tramite cron job, garantendo che le informazioni sui prezzi siano sempre aggiornate, e deve tenere conto anche di attuali 
+promozioni e offerte speciali. Per tale motivo il DB deve essere costituito anche di campi specifici per la gestione delle offerte, come il prezzo attuale, 
+rispetto al prezzo originale e al timestamp dell'ultimo aggiornamento.
+
+L'obiettivo del progetto è fornire uno strumento potente e flessibile per confrontare i prezzi dei supermercati, aiutando gli utenti a risparmiare tempo e denaro nelle loro spese quotidiane. Questo sistema è altamente estensibile, permettendo l'aggiunta di nuovi supermercati e funzionalità in futuro.
+
+L'utente inserisce la lista della spesa in un'interfaccia web, e il sistema deve utilizzare degli LLM per ottimizzare la spesa all'utente.
+
+I limiti maggiori includono la dipendenza dalla struttura dei siti web dei supermercati, che può cambiare e richiedere aggiornamenti ai parser. Inoltre, alcuni
+supermercati, come Eurospin, richiedono il login per accedere ai prezzi, il che può complicare lo scraping. Il sistema deve essere progettato per far fronte a queste sfide in modo robusto. Infine, un altro limite è rappresentato dalla varietà di nomi di prodotti che generalmente sono descritti in linguaggio naturale in maniera 
+collettiva, ad esempio una lista della spesa contiene generalmente termini come "pasta", "latte", "legumi", "carne", mentre sul DB saranno presenti nomi di prodotti
+specifici come "Fusilli Barilla 500g", "Latte parzialmente scremato UHT 1L", "Fagioli cannellini 400g". Per questo motivo è necessario un sistema di fuzzy matching e ragionamento semantico per mappare correttamente i termini generici della lista della spesa con i prodotti specifici presenti nel database.
+
+# Stato attuale del progetto
+
 ## 📊 Panoramica
 
 | Supermercato | Prodotti | Tecnologia | Status |
@@ -34,7 +53,7 @@ Sistema automatico di scraping multi-supermercato per confronto prezzi e analisi
 
 ```bash
 # Clone repository
-git clone <repo-url>
+git clone <repo-url> -b supermarket_parser
 cd supermarket_parser
 
 # Setup ambiente virtuale
@@ -151,7 +170,7 @@ GEMINI_API_KEY=your-gemini-api-key
 
 # Ollama locale (opzionale - già incluso)
 OLLAMA_API_URL=http://localhost:11434
-OLLAMA_MODEL=functiongemma:270m
+OLLAMA_MODEL=functiongemma:latest
 ```
 
 ### Parametri Scraping (src/config.py)

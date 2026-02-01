@@ -341,46 +341,123 @@ class EurospinParser:
         return True
 
     def scrape_current_page(self, categoria):
-        # Provo diversi selettori per trovare i prezzi
-        prices = self.driver.find_elements(By.XPATH, "//*[contains(text(), '€')]")
+        # Use JS to find all product cards (piercing Shadow DOM)
+        js_script = """
+        function getAllProductTexts() {
+            var cardTexts = [];
+            var processedNodes = new Set();
+            
+            function isVisible(elem) {
+                if (!elem) return false;
+                return !!(elem.offsetWidth || elem.offsetHeight || elem.getClientRects().length);
+            }
+
+            // Recursive function to find price elements in Shadow DOM
+            function findPrices(root) {
+                var prices = [];
+                
+                // 1. Check current root for price elements
+                // Try selectors first
+                var candidates = root.querySelectorAll(".price, .prezzo, [class*='price'], [class*='prezzo']");
+                
+                candidates.forEach(el => {
+                     if (el.innerText && el.innerText.includes('€')) {
+                         prices.push(el);
+                     }
+                });
+
+                // Also check generic elements if they contain € (fallback)
+                if (candidates.length === 0) {
+                     // Limit this to leaf nodes to avoid huge duplicates
+                     var treeWalker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+                     var textNode;
+                     while(textNode = treeWalker.nextNode()) {
+                         if (textNode.nodeValue && textNode.nodeValue.includes('€')) {
+                             if (textNode.parentElement && isVisible(textNode.parentElement)) {
+                                 prices.push(textNode.parentElement);
+                             }
+                         }
+                     }
+                }
+
+                // 2. Traverse children for Shadow Roots
+                var walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null, false);
+                var node;
+                while(node = walker.nextNode()) {
+                    if (node.shadowRoot) {
+                        prices = prices.concat(findPrices(node.shadowRoot));
+                    }
+                }
+                
+                return prices;
+            }
+
+            var prices = findPrices(document.body);
+            
+            prices.forEach(p => {
+                if (!isVisible(p)) return;
+                
+                var card = p;
+                // Go up levels to find the card container
+                for(var i=0; i<6; i++) {
+                    if (card.parentNode && card.parentNode.nodeType === 1) {
+                         card = card.parentNode;
+                    } else if (card.getRootNode() instanceof ShadowRoot && card.parentNode === card.getRootNode()) {
+                         card = card.getRootNode().host;
+                    } else {
+                         break;
+                    }
+                    
+                    if (processedNodes.has(card)) break;
+                    
+                    var txt = card.innerText;
+                    if (!txt) continue;
+                    
+                    // Filter out non-card text
+                    if (txt.includes('Totale') || txt.includes('Riepilogo')) break;
+                    
+                    // Must contain a price pattern
+                    if (/\\d+[.,]\\d+\\s?€/.test(txt)) {
+                         // Must have multiple lines (Name, Price, etc.)
+                         if (txt.split('\\n').length >= 2) {
+                             cardTexts.push(txt);
+                             processedNodes.add(card);
+                             break;
+                         }
+                    }
+                }
+            });
+            
+            return cardTexts;
+        }
+        return getAllProductTexts();
+        """
         
-        # Se XPath fallisce, provo con CSS selectors comuni
-        if not prices:
-            prices = self.driver.find_elements(By.CSS_SELECTOR, ".price, .prezzo, [class*='price'], [class*='prezzo']")
-        
-        logger.debug(f"Trovati {len(prices)} elementi con €")
-        if not prices: 
+        try:
+            card_texts = self.driver.execute_script(js_script)
+        except Exception as e:
+            logger.error(f"Errore JS scraping: {e}")
+            card_texts = []
+
+        logger.debug(f"Trovati {len(card_texts)} potenziali prodotti (Shadow DOM)")
+        if not card_texts: 
             return 0
         
         count = 0
-        processed_cards = []
         
-        for p in prices:
-            if not p.is_displayed(): 
-                continue
+        for txt in card_texts:
             try:
-                card = p
-                # Risalita intelligente
-                for _ in range(6):
-                    try: 
-                        card = card.find_element(By.XPATH, "./..")
-                    except: 
-                        break
-                    
-                    if card in processed_cards: 
-                        break
-                    
-                    txt = card.text.strip()
-                    lines = [l.strip() for l in txt.split('\n') if l.strip()]
-                    
-                    if len(lines) < 2: 
-                        continue 
-                    if any(x in txt.lower() for x in ["totale", "carrello", "riepilogo"]): 
-                        break
+                txt = txt.strip()
+                lines = [l.strip() for l in txt.split('\n') if l.strip()]
+                
+                if len(lines) < 2: 
+                    continue 
+                if any(x in txt.lower() for x in ["totale", "carrello", "riepilogo"]): 
+                    break
 
-                    matches = re.findall(r'\d+[.,]\d+\s?€', txt)
-                    if not matches: 
-                        continue
+                matches = re.findall(r'\d+[.,]\d+\s?€', txt)
+                if not matches: 
+                    continue
                     price_val = self._clean_price(matches[0])
                     if price_val < 0.1: 
                         break 

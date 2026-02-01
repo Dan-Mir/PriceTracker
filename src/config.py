@@ -13,19 +13,19 @@ DATABASE_BACKUP_DIR = "backups"
 # ==================== SCRAPING ====================
 # Timeout e delay
 SELENIUM_TIMEOUT = 25  # secondi per WebDriverWait
-PAGE_LOAD_DELAY = 5    # secondi di attesa dopo caricamento pagina
-SCROLL_DELAY = 2       # secondi di attesa dopo scroll
+PAGE_LOAD_DELAY = 3    # secondi di attesa dopo caricamento pagina (ridotto)
+SCROLL_DELAY = 1       # secondi di attesa dopo scroll (ridotto)
 LOGIN_DELAY = 8        # secondi di attesa dopo login
-CATEGORY_DELAY = 5     # secondi tra una categoria e l'altra
-NEXT_PAGE_DELAY = 3    # secondi tra una pagina e l'altra
+CATEGORY_DELAY = 2     # secondi tra una categoria e l'altra (ridotto)
+NEXT_PAGE_DELAY = 2    # secondi tra una pagina e l'altra (ridotto)
 
 # Rate limiting
-REQUEST_DELAY_MIN = 2  # delay minimo tra richieste (secondi)
-REQUEST_DELAY_MAX = 5  # delay massimo tra richieste (secondi)
+REQUEST_DELAY_MIN = 1  # delay minimo tra richieste (secondi)
+REQUEST_DELAY_MAX = 3  # delay massimo tra richieste (secondi)
 
 # Limiti
-MAX_ITERATIONS = 60    # massimo numero di categorie da visitare
-MAX_PAGES_PER_CATEGORY = 15  # massimo numero di pagine per categoria
+MAX_ITERATIONS = 500   # aumentato per coprire tutte le categorie
+MAX_PAGES_PER_CATEGORY = 60  # massimo numero di pagine per categoria
 MAX_RETRIES = 3        # numero tentativi in caso di errore
 
 # ==================== EUROSPIN ====================
@@ -61,7 +61,8 @@ CHROME_OPTIONS = [
     '--window-size=1920,1080',
     '--disable-blink-features=AutomationControlled',
     '--disable-extensions',
-    '--disable-gpu'
+    '--disable-gpu',
+    '--blink-settings=imagesEnabled=false' # Disabilita immagini per velocità
 ]
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"

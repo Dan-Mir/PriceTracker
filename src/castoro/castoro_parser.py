@@ -38,6 +38,7 @@ class CastoroParser:
     # Include TUTTE le categorie del sito per massima copertura prodotti
     # Script generazione: generate_castoro_urls.py
     SUBCATEGORIES = CASTORO_SUBCATEGORY_URLS
+    # SUBCATEGORIES = CASTORO_SUBCATEGORY_URLS[:3]
 
     
     def __init__(self, headless: bool = True):
@@ -164,7 +165,7 @@ class CastoroParser:
     def _scrape_category_by_url(self, category_url: str) -> List[Dict]:
         """
         Scraping di una singola categoria usando l'URL diretto
-        Gestisce automaticamente la paginazione
+        Gestisce automaticamente la paginazione tramite click sul bottone 'Next'
         
         Args:
             category_url: URL della categoria (es: /category/frutta-e-verdura/frutta-fresca)
@@ -174,18 +175,19 @@ class CastoroParser:
         """
         all_products = []
         page = 1
-        max_pages = 20  # Limite di sicurezza
+        max_pages = config.MAX_PAGES_PER_CATEGORY
         
         try:
             category_name = category_url.split('/')[-1].replace('-', ' ').title()
             
+            # Navigazione iniziale
+            full_url = f"{self.BASE_URL}{category_url}"
+            logger.info(f"Navigazione a: {full_url}")
+            self.driver.get(full_url)
+            time.sleep(config.PAGE_LOAD_DELAY)
+            
             while page <= max_pages:
-                # Costruisci URL con paginazione
-                full_url = f"{self.BASE_URL}{category_url}?page={page}"
-                
-                logger.info(f"Navigazione a: {full_url} (pagina {page})")
-                self.driver.get(full_url)
-                time.sleep(config.PAGE_LOAD_DELAY)
+                logger.info(f"Scraping pagina {page}...")
                 
                 # Scroll per caricare prodotti lazy-loaded
                 self._scroll_to_load()
@@ -195,11 +197,6 @@ class CastoroParser:
                     By.CSS_SELECTOR,
                     ".product.product-card"
                 )
-                
-                # Se non ci sono prodotti, abbiamo finito
-                if not product_cards:
-                    logger.info(f"Nessun prodotto trovato a pagina {page}, fine paginazione")
-                    break
                 
                 logger.info(f"Trovati {len(product_cards)} prodotti a pagina {page}")
                 
@@ -214,26 +211,38 @@ class CastoroParser:
                         logger.debug(f"Errore estrazione prodotto: {e}")
                         continue
                 
-                # Se non abbiamo estratto prodotti validi, potremmo essere alla fine
                 if page_products == 0:
                     logger.info(f"Nessun prodotto valido a pagina {page}, fine paginazione")
                     break
                 
-                # Verifica se esiste pulsante "next" o se siamo all'ultima pagina
+                # Gestione Paginazione (Click su Next)
                 try:
-                    # Cerca pulsante next disabilitato (indica ultima pagina)
-                    next_button = self.driver.find_element(
-                        By.CSS_SELECTOR,
-                        ".swiper-button-next.swiper-button-disabled"
-                    )
-                    logger.info(f"Ultima pagina raggiunta (pagina {page})")
+                    # Trova bottoni di navigazione (.v-pagination__navigation)
+                    # Solitamente sono 2: Prev e Next. Next è l'ultimo.
+                    nav_buttons = self.driver.find_elements(By.CSS_SELECTOR, ".v-pagination__navigation")
+                    
+                    if not nav_buttons:
+                        logger.info("Nessun bottone di paginazione trovato")
+                        break
+                        
+                    next_btn = nav_buttons[-1]
+                    
+                    # Se il bottone next è disabilitato, siamo alla fine
+                    if "disabled" in next_btn.get_attribute("class") or not next_btn.is_enabled():
+                        logger.info("Ultima pagina raggiunta (Next disabilitato)")
+                        break
+                        
+                    # Clicca su Next
+                    logger.info("Clicco su Next Page...")
+                    self.driver.execute_script("arguments[0].click();", next_btn)
+                    
+                    # Attendi caricamento nuova pagina
+                    time.sleep(config.NEXT_PAGE_DELAY)
+                    page += 1
+                    
+                except Exception as e:
+                    logger.warning(f"Errore paginazione: {e}")
                     break
-                except:
-                    # Pulsante next non disabilitato, continua
-                    pass
-                
-                page += 1
-                time.sleep(2)  # Delay tra pagine
         
         except Exception as e:
             logger.error(f"Errore scraping categoria {category_url}: {e}", exc_info=True)
@@ -346,7 +355,7 @@ class CastoroParser:
             # Nome prodotto
             try:
                 name_elem = card_element.find_element(By.CSS_SELECTOR, ".product-name")
-                nome = name_elem.text.strip()
+                nome = name_elem.get_attribute("textContent").strip()
             except NoSuchElementException:
                 logger.debug("Nome prodotto non trovato")
                 return None
@@ -357,7 +366,7 @@ class CastoroParser:
             # Prezzo
             try:
                 price_elem = card_element.find_element(By.CSS_SELECTOR, ".product-price")
-                prezzo_text = price_elem.text.strip()
+                prezzo_text = price_elem.get_attribute("textContent").strip()
                 prezzo = self._parse_price(prezzo_text)
             except NoSuchElementException:
                 logger.debug(f"Prezzo non trovato per {nome}")
@@ -370,7 +379,7 @@ class CastoroParser:
             marca = None
             try:
                 brand_elem = card_element.find_element(By.CSS_SELECTOR, ".product-brand")
-                marca = brand_elem.text.strip()
+                marca = brand_elem.get_attribute("textContent").strip()
             except NoSuchElementException:
                 # Prova ad estrarre dal nome
                 marca = self.normalizer.extract_brand_from_text(nome)
@@ -379,7 +388,7 @@ class CastoroParser:
             unita_misura = None
             try:
                 descr_elem = card_element.find_element(By.CSS_SELECTOR, ".product-descr")
-                descr_text = descr_elem.text.strip()
+                descr_text = descr_elem.get_attribute("textContent").strip()
                 unita_misura = self.normalizer.extract_unit(descr_text)
             except NoSuchElementException:
                 # Prova ad estrarre dal nome
@@ -406,7 +415,7 @@ class CastoroParser:
                             By.CSS_SELECTOR,
                             ".old-price, .price-before"
                         )
-                        old_price = self._parse_price(old_price_elem.text)
+                        old_price = self._parse_price(old_price_elem.get_attribute("textContent"))
                         
                         if old_price and old_price > prezzo:
                             prezzo_listino = old_price
