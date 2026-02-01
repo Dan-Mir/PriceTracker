@@ -10,11 +10,28 @@ import pickle
 import os
 import platform
 from collections import deque
-from ..db import PriceDatabase
-from ..logger import get_logger
-from ..normalizer import ProductNormalizer
-from ..utils import retry_on_exception, RateLimiter
-from .. import config
+
+try:
+    # Package imports (when running as module)
+    from ..db import PriceDatabase
+    from ..logger import get_logger
+    from ..normalizer import ProductNormalizer
+    from ..utils import retry_on_exception, RateLimiter
+    from .. import config
+    from .eurospin_categories import EUROSPIN_MAIN_CATEGORIES
+except ImportError:
+    # Script imports (when running from src/)
+    import sys
+    import os
+    # Ensure src is in path
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    
+    from db import PriceDatabase
+    from logger import get_logger
+    from normalizer import ProductNormalizer
+    from utils import retry_on_exception, RateLimiter
+    import config
+    from eurospin.eurospin_categories import EUROSPIN_MAIN_CATEGORIES
 
 logger = get_logger(__name__)
 
@@ -47,6 +64,7 @@ class EurospinParser:
         
         # Usa blacklist da config
         self.BLACKLIST_URL = config.URL_BLACKLIST
+        self.total_saved = 0
 
     # --- GESTIONE SESSIONE COMPLETA ---
     def save_cookies(self):
@@ -124,7 +142,7 @@ class EurospinParser:
         """Verifica se la sessione corrente mostra i prezzi (sessione valida)"""
         try:
             # Visita una pagina prodotti nota per testare
-            test_url = f"{self.store_url}/frutta-e-verdura"
+            test_url = f"{self.store_url}/category/frutta-e-verdura"
             logger.info("Verifico validità sessione...")
             self.driver.get(test_url)
             time.sleep(config.PAGE_LOAD_DELAY)
@@ -138,6 +156,14 @@ class EurospinParser:
             if not prices:
                 prices = self.driver.find_elements(By.CSS_SELECTOR, ".price, .prezzo, [class*='price'], [class*='prezzo']")
             
+            # Anche controllo se c'è il bottone "Accedi" che indica logout
+            try:
+                login_btn = self.driver.find_elements(By.XPATH, "//button[contains(text(), 'Accedi') or contains(text(), 'ACCEDI')]")
+                if login_btn:
+                     logger.warning("Trovato bottone Accedi - sessione non valida")
+                     return False
+            except: pass
+
             if len(prices) > 0:
                 logger.info(f"Sessione valida - {len(prices)} prezzi visibili")
                 return True
@@ -197,10 +223,13 @@ class EurospinParser:
         except: pass
 
         try:
+            # Apri menu se necessario per trovare login
+            # Spesso icona profilo
             self.driver.execute_script("document.querySelector('.icon-profile').click();")
         except:
-            logger.error("Icona profilo non trovata")
-            return False
+            logger.error("Icona profilo non trovata, tento URL login diretto...")
+            # Fallback URL login se esiste (non standard in SPA, ma proviamo)
+            pass
         
         time.sleep(5) 
 
@@ -230,6 +259,7 @@ class EurospinParser:
         logger.info("Controlla la mail per il codice OTP")
         print("\n   📩 CONTROLLA LA MAIL ORA")
         try:
+            # INTERACTIVE INPUT
             otp = input("   👉 INSERISCI CODICE: ")
         except: return False
         
@@ -247,9 +277,11 @@ class EurospinParser:
         
         logger.info("Attendo completamento login...")
         time.sleep(config.LOGIN_DELAY)
-        if "identity.eurospin" in self.driver.current_url:
-            logger.warning("Login probabilmente fallito")
-            return False
+        
+        # Verifica se login riuscito
+        if not self._verifica_sessione_valida():
+             logger.warning("Login sembra fallito (nessun prezzo visibile).")
+             # return False # Non usciamo, proviamo comunque a salvare i cookie magari è solo un glitch
             
         logger.info("LOGIN RIUSCITO!")
         
@@ -263,30 +295,19 @@ class EurospinParser:
         logger.info("=== INIZIO CRAWLER ===")
         time.sleep(3)
         
-        try:
-            self.driver.execute_script("var b=document.querySelector('.icon-menu')||document.querySelector('button');if(b)b.click();")
-            time.sleep(2)
-        except: pass
-
         queue = deque()
         visited = set()
         
-        # Recupero categorie iniziali dal menu
-        try:
-            links = self.driver.find_elements(By.CSS_SELECTOR, "nav.v-navigation-drawer .category2 a")
-            main_links = self.driver.find_elements(By.CSS_SELECTOR, "nav.v-navigation-drawer a.menu-link")
+        # 1. Carica categorie SEED statiche
+        logger.info(f"Caricamento {len(EUROSPIN_MAIN_CATEGORIES)} categorie principali...")
+        for cat_url in EUROSPIN_MAIN_CATEGORIES:
+            full_url = f"{self.store_url}{cat_url}" if not cat_url.startswith("http") else cat_url
+            # Rimuovi eventuali doppi slash
+            full_url = full_url.replace(f"{self.store_url}/category//", f"{self.store_url}/category/")
             
-            for l in links + main_links:
-                h = l.get_attribute("href")
-                t = l.get_attribute("innerText").strip()
-                if self._is_valid_category_url(h, t):
-                    if h not in visited:
-                        queue.append((h, t))
-                        visited.add(h)
-            
-            logger.info(f"Coda iniziale: {len(queue)} categorie")
-        except Exception as e:
-            logger.error(f"Errore recupero menu: {e}")
+            name = cat_url.split('/')[-1].replace('-', ' ').title()
+            queue.append((full_url, name))
+            visited.add(full_url)
 
         max_iter = config.MAX_ITERATIONS
         iter_count = 0
@@ -309,15 +330,17 @@ class EurospinParser:
                 
                 prodotti_trovati = self.scrape_current_page(nome_cat)
                 
-                if prodotti_trovati < 2:
-                    new_links = self.find_subcategories_in_body()
-                    added = 0
-                    for nh, nt in new_links:
-                        if nh not in visited and self._is_valid_category_url(nh, nt):
-                            queue.append((nh, f"{nome_cat} > {nt}")) 
-                            visited.add(nh)
-                            added += 1
-                else:
+                # Se troviamo pochi prodotti o siamo in una macro-categoria, cerchiamo sottocategorie
+                # Anche se troviamo prodotti, cerchiamo sottocategorie per approfondire (es: /carne-e-pesce -> carne)
+                new_links = self.find_subcategories_in_body(url)
+                for nh, nt in new_links:
+                    if nh not in visited and self._is_valid_category_url(nh, nt):
+                        queue.append((nh, f"{nome_cat} > {nt}")) 
+                        visited.add(nh)
+                        logger.info(f"   -> Trovata sottocategoria: {nt}")
+
+                # Gestione paginazione solo se ci sono prodotti
+                if prodotti_trovati > 0:
                     page = 1
                     while self.go_next_page():
                         page += 1
@@ -327,7 +350,7 @@ class EurospinParser:
                             break 
                         
             except Exception as e:
-                logger.error(f"Errore durante visita categoria: {e}")
+                logger.error(f"Errore durante visita categoria {nome_cat}: {e}")
 
     def _is_valid_category_url(self, url, text):
         if not url or "javascript" in url: return False
@@ -357,7 +380,6 @@ class EurospinParser:
                 var prices = [];
                 
                 // 1. Check current root for price elements
-                // Try selectors first
                 var candidates = root.querySelectorAll(".price, .prezzo, [class*='price'], [class*='prezzo']");
                 
                 candidates.forEach(el => {
@@ -366,9 +388,7 @@ class EurospinParser:
                      }
                 });
 
-                // Also check generic elements if they contain € (fallback)
                 if (candidates.length === 0) {
-                     // Limit this to leaf nodes to avoid huge duplicates
                      var treeWalker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
                      var textNode;
                      while(textNode = treeWalker.nextNode()) {
@@ -398,7 +418,6 @@ class EurospinParser:
                 if (!isVisible(p)) return;
                 
                 var card = p;
-                // Go up levels to find the card container
                 for(var i=0; i<6; i++) {
                     if (card.parentNode && card.parentNode.nodeType === 1) {
                          card = card.parentNode;
@@ -413,12 +432,9 @@ class EurospinParser:
                     var txt = card.innerText;
                     if (!txt) continue;
                     
-                    // Filter out non-card text
                     if (txt.includes('Totale') || txt.includes('Riepilogo')) break;
                     
-                    // Must contain a price pattern
                     if (/\\d+[.,]\\d+\\s?€/.test(txt)) {
-                         // Must have multiple lines (Name, Price, etc.)
                          if (txt.split('\\n').length >= 2) {
                              cardTexts.push(txt);
                              processedNodes.add(card);
@@ -444,72 +460,50 @@ class EurospinParser:
             return 0
         
         count = 0
-        
         for txt in card_texts:
             try:
                 txt = txt.strip()
                 lines = [l.strip() for l in txt.split('\n') if l.strip()]
                 
-                if len(lines) < 2: 
-                    continue 
-                if any(x in txt.lower() for x in ["totale", "carrello", "riepilogo"]): 
-                    break
+                if len(lines) < 2: continue 
+                if any(x in txt.lower() for x in ["totale", "carrello", "riepilogo"]): break
 
                 matches = re.findall(r'\d+[.,]\d+\s?€', txt)
-                if not matches: 
-                    continue
-                    price_val = self._clean_price(matches[0])
-                    if price_val < 0.1: 
-                        break 
-                    
-                    # Estrazione intelligente nome, marca e unità
-                    nome_prodotto = "N/D"
-                    marca = None
-                    unita_misura = None
-                    
-                    # Estrai unità misura dal testo completo
-                    unita_misura = self.normalizer.extract_unit(txt)
-                    
-                    # Processa le linee per estrarre nome e marca
-                    valid_lines = []
-                    for line in lines:
-                        low = line.lower()
-                        # Salta linee con prezzi, parole chiave inutili o troppo corte
-                        if "€" in line and any(c.isdigit() for c in line): 
-                            continue
-                        if self._is_weight(line): 
-                            continue
-                        if any(word in low for word in config.PARSING_IGNORE_WORDS): 
-                            continue
-                        if len(line) < 3: 
-                            continue
-                        
-                        valid_lines.append(line)
-                    
-                    # Estrai nome prodotto (prima linea valida)
-                    if valid_lines:
-                        nome_prodotto = valid_lines[0]
-                        
-                        # Tenta estrazione marca (seconda linea se esiste)
-                        if len(valid_lines) > 1:
-                            # Usa il normalizzatore per estrarre la marca
-                            marca = self.normalizer.extract_brand_from_text(txt, nome_prodotto)
-                    
-                    if nome_prodotto != "N/D":
-                        logger.debug(f"Salvo: {nome_prodotto} [{marca or 'N/D'}] [{unita_misura or 'N/D'}] - €{price_val}")
-                        self.db.upsert_product(
-                            nome=nome_prodotto, 
-                            marca=marca, 
-                            prezzo_listino=price_val, 
-                            prezzo_attuale=price_val, 
-                            categoria=categoria, 
-                            supermercato="Eurospin",
-                            unita_misura=unita_misura
-                        )
-                        
-                        processed_cards.append(card)
-                        count += 1
-                        break 
+                if not matches: continue
+                
+                price_val = self._clean_price(matches[0])
+                if price_val < 0.1: continue
+                
+                nome_prodotto = "N/D"
+                marca = None
+                unita_misura = self.normalizer.extract_unit(txt)
+                
+                valid_lines = []
+                for line in lines:
+                    low = line.lower()
+                    if "€" in line and any(c.isdigit() for c in line): continue
+                    if self._is_weight(line): continue
+                    if any(word in low for word in config.PARSING_IGNORE_WORDS): continue
+                    if len(line) < 3: continue
+                    valid_lines.append(line)
+                
+                if valid_lines:
+                    nome_prodotto = valid_lines[0]
+                    if len(valid_lines) > 1:
+                        marca = self.normalizer.extract_brand_from_text(txt, nome_prodotto)
+                
+                if nome_prodotto != "N/D":
+                    self.db.upsert_product(
+                        nome=nome_prodotto, 
+                        marca=marca, 
+                        prezzo_listino=price_val, 
+                        prezzo_attuale=price_val, 
+                        categoria=categoria, 
+                        supermercato="Eurospin",
+                        unita_misura=unita_misura
+                    )
+                    count += 1
+                    self.total_saved += 1
             except Exception as e:
                 logger.debug(f"Errore parsing card: {e}")
                 continue
@@ -518,34 +512,120 @@ class EurospinParser:
             logger.info(f"Trovati {count} prodotti in categoria")
         return count
 
-    def find_subcategories_in_body(self):
+    def find_subcategories_in_body(self, current_url):
+        """Cerca link a sottocategorie nella pagina corrente"""
         links = []
         try:
-            candidates = self.driver.find_elements(By.CSS_SELECTOR, ".v-main a[href]")
-            for l in candidates:
-                if not l.is_displayed(): continue
-                h = l.get_attribute("href")
-                t = l.get_attribute("innerText").strip()
-                if self._is_valid_category_url(h, t):
-                    if (h, t) not in links:
-                        links.append((h, t))
-        except: pass
+            # Cerchiamo link che estendono l'URL corrente o sono relativi
+            # Es: siamo su /category/frutta-e-verdura, cerchiamo /frutta-e-verdura/frutta-fresca (senza /category)
+            
+            # Helper JS per shadow dom
+            js_script = """
+            function getAllLinks(root) {
+                var links = [];
+                var anchors = root.querySelectorAll('a[href]');
+                anchors.forEach(a => {
+                    var t = a.innerText || "";
+                    if (!t) {
+                         // Prova a cercare immagini con alt o title
+                         var img = a.querySelector('img');
+                         if (img) t = img.alt || img.title || "";
+                    }
+                    links.push({href: a.href, text: t});
+                });
+                
+                var walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null, false);
+                while(node = walker.nextNode()) {
+                    if (node.shadowRoot) {
+                        links = links.concat(getAllLinks(node.shadowRoot));
+                    }
+                }
+                return links;
+            }
+            return getAllLinks(document.body);
+            """
+            
+            candidates = self.driver.execute_script(js_script)
+            
+            # Normalizza URL corrente per confronto
+            # Rimuovi /category/ se presente per trovare lo slug base
+            base_url_clean = current_url.split('?')[0].rstrip('/')
+            category_slug = base_url_clean.split('/')[-1]
+            
+            # Se siamo in /category/foo, cerchiamo link che contengono /foo/
+            
+            for item in candidates:
+                h = item['href']
+                t = item['text']
+                if not h: continue
+                
+                # Filtra
+                if "javascript" in h or "mailto" in h: continue
+                
+                h_clean = h.split('?')[0].rstrip('/')
+                
+                # Logica rilassata:
+                # 1. Il link deve appartenere allo stesso dominio (o relativo)
+                if "eurospin.it" in h_clean:
+                    # 2. Deve contenere lo slug della categoria corrente
+                    if f"/{category_slug}/" in h_clean:
+                        # 3. Deve essere diverso dall'URL base
+                        if h_clean != base_url_clean and h_clean != base_url_clean.replace("/category", ""):
+                            # 4. Escludi prodotti (/product/)
+                            if "/product/" not in h_clean:
+                                # Fallback nome se vuoto
+                                if not t or len(t) < 2:
+                                    t = h_clean.split('/')[-1].replace('-', ' ').title()
+                                
+                                if (h, t) not in links:
+                                    links.append((h, t))
+                            
+        except Exception as e: 
+            logger.debug(f"Errore ricerca sottocategorie: {e}")
+            pass
         return links
+
 
     def go_next_page(self):
         try:
-            btns = self.driver.find_elements(By.CSS_SELECTOR, "button[aria-label*='Successiva'], button[aria-label*='Next']")
-            if not btns:
-                btns = self.driver.find_elements(By.CSS_SELECTOR, ".v-pagination .mdi-chevron-right")
-                if btns: btns = [btns[0].find_element(By.XPATH, "./..")]
+            # Selector aggiornati per Vue.js pagination trovata
+            selectors = [
+                "button[aria-label*='Successiva']",
+                "button[aria-label*='Next']",
+                "button[aria-label*='Pagina seguente']",
+                "button[aria-label*='seguente']",
+                ".v-pagination__navigation:not(.v-pagination__navigation--disabled) button"
+            ]
             
-            if btns and btns[0].is_enabled() and "disabled" not in btns[0].get_attribute("class"):
+            btns = []
+            for sel in selectors:
+                btns = self.driver.find_elements(By.CSS_SELECTOR, sel)
+                if btns: break
+            
+            # Se non trova con selettori, cerca specificamente l'ultimo bottone della paginazione
+            if not btns:
+                nav_btns = self.driver.find_elements(By.CSS_SELECTOR, ".v-pagination__navigation")
+                if nav_btns:
+                    last_btn = nav_btns[-1]
+                    # Verifica che sia il bottone 'next' (spesso è l'ultimo nel DOM)
+                    if "disabled" not in last_btn.get_attribute("class"):
+                         btns = [last_btn]
+
+            if btns and btns[0].is_enabled():
+                # Check additional disabled class often used in Vue/Material
+                if "disabled" in btns[0].get_attribute("class"):
+                    return False
+                    
                 self.driver.execute_script("arguments[0].click();", btns[0])
                 time.sleep(3)
                 return True
-        except: pass
+        except Exception as e: 
+            logger.debug(f"Errore paginazione: {e}")
         return False
 
     def close(self):
         self.db.close()
         self.driver.quit()
+
+    def get_total_products_saved(self):
+        return self.total_saved

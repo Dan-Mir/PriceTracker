@@ -5,8 +5,13 @@ import time
 import random
 from functools import wraps
 from typing import Callable, Any, Tuple, Type
-from src.config import MAX_RETRIES, REQUEST_DELAY_MIN, REQUEST_DELAY_MAX
-from src.logger import get_logger
+
+try:
+    from src.config import MAX_RETRIES, REQUEST_DELAY_MIN, REQUEST_DELAY_MAX
+    from src.logger import get_logger
+except ImportError:
+    from config import MAX_RETRIES, REQUEST_DELAY_MIN, REQUEST_DELAY_MAX
+    from logger import get_logger
 
 logger = get_logger(__name__)
 

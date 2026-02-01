@@ -19,11 +19,17 @@ try:
     from .castoro_all_urls import CASTORO_SUBCATEGORY_URLS
     from .. import config
 except ImportError:
-    from src.db import PriceDatabase
-    from src.logger import get_logger
-    from src.normalizer import ProductNormalizer
-    from src.castoro.castoro_all_urls import CASTORO_SUBCATEGORY_URLS
-    from src import config
+    # Script imports (when running from src/)
+    import sys
+    import os
+    # Ensure src is in path
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+    from db import PriceDatabase
+    from logger import get_logger
+    from normalizer import ProductNormalizer
+    from castoro.castoro_all_urls import CASTORO_SUBCATEGORY_URLS
+    import config
 
 logger = get_logger(__name__)
 

@@ -41,3 +41,5 @@ cleanup_and_organize.sh
 nohup.out
 
 lista_spesa.txt
+
+.gemini*

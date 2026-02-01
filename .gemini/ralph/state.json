@@ -1,8 +1,0 @@
-{
-    "active": true,
-    "current_iteration": 1,
-    "max_iterations": 10,
-    "completion_promise": "",
-    "original_prompt": "Read the @README.md file. It is a Document Requirement Specification of supermarket_parser project. This document provides goals and actual architecture of the project. We need to improve the quality of parsing from the two supermarkets since they are not collecting good the whole amount of products, but just a part of them. The task is complete if the number of items in the SQlite DB is really high, a mean 100/150 elements for each category, for each supermarket",
-    "started_at": "2026-02-01T12:00:00Z"
-}

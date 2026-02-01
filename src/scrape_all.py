@@ -2,7 +2,7 @@
 Script principale per lo scraping di tutti i supermercati
 """
 import argparse
-from src.logger import get_logger
+from logger import get_logger
 
 logger = get_logger(__name__)
 
